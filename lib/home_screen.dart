@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'models/drink_entry.dart';
+import 'manual_entry.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -10,13 +12,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 1; // default to Home
   final PageController _pageController = PageController(initialPage: 1);
-
-  // Placeholder views for now
-  final List<Widget> _views = const [
-    Center(child: Text("Leaderboard View")),
-    Center(child: Text("Home View")),
-    Center(child: Text("Settings View")),
-  ];
+  final List<DrinkEntry> _drinks = [];
 
   void _onItemTapped(int index) {
     setState(() {
@@ -34,18 +30,26 @@ class _HomeScreenState extends State<HomeScreen> {
             ListTile(
               leading: const Icon(Icons.edit),
               title: const Text('Manual Entry'),
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(context);
-                // TODO: Navigate to manual entry form
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ManualEntryScreen(),
+                  ),
+                );
+                if (result != null && result is DrinkEntry) {
+                  setState(() {
+                    _drinks.add(result);
+                  });
+                }
               },
             ),
             ListTile(
               leading: const Icon(Icons.camera_alt),
               title: const Text('Picture/Automatic Entry'),
-              enabled: false, // disabled for now
-              onTap: () {
-                // Future: open camera
-              },
+              enabled: false,
+              onTap: () {},
             ),
           ],
         );
@@ -63,7 +67,11 @@ class _HomeScreenState extends State<HomeScreen> {
             _selectedIndex = index;
           });
         },
-        children: _views,
+        children: [
+          const Center(child: Text("Leaderboard View (placeholder)")),
+          DrinkListView(drinks: _drinks),
+          const Center(child: Text("Settings View (placeholder)")),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddDrinkMenu,
@@ -78,18 +86,50 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             IconButton(
               icon: const Icon(Icons.leaderboard),
-              color: _selectedIndex == 0 ? Theme.of(context).colorScheme.primary : null,
+              color: _selectedIndex == 0
+                  ? Theme.of(context).colorScheme.primary
+                  : null,
               onPressed: () => _onItemTapped(0),
             ),
-            const SizedBox(width: 40), // space for FAB
+            const SizedBox(width: 40),
             IconButton(
               icon: const Icon(Icons.settings),
-              color: _selectedIndex == 2 ? Theme.of(context).colorScheme.primary : null,
+              color: _selectedIndex == 2
+                  ? Theme.of(context).colorScheme.primary
+                  : null,
               onPressed: () => _onItemTapped(2),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class DrinkListView extends StatelessWidget {
+  final List<DrinkEntry> drinks;
+  const DrinkListView({super.key, required this.drinks});
+
+  @override
+  Widget build(BuildContext context) {
+    final sorted = [...drinks]..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    return ListView.builder(
+      itemCount: sorted.length,
+      itemBuilder: (context, index) {
+        final drink = sorted[index];
+        return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: ListTile(
+            leading: const Icon(Icons.local_drink),
+            title: Text("${drink.type} - ${drink.volume.toStringAsFixed(0)} ml"),
+            subtitle: Text(
+              "${drink.abv.toStringAsFixed(1)}% • ${drink.units.toStringAsFixed(2)} units\n"
+                  "${drink.timestamp.toLocal()}${drink.location != null ? " • ${drink.location}" : ""}",
+            ),
+            isThreeLine: true,
+          ),
+        );
+      },
     );
   }
 }
