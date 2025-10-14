@@ -1,0 +1,33 @@
+# Flutter/Dart/Pub
+.dart_tool/
+.packages
+.pub-cache/
+build/
+
+# Android
+android/.gradle/
+android/app/build/
+*.iml
+.gradle/
+local.properties
+
+# iOS
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
+
+# Xcode
+*.xcworkspace
+*.xcuserstate
+*.xcuserdatad
+DerivedData/
+
+# VS Code / Android Studio
+.vscode/
+.idea/
+
+# Misc
+*.log
