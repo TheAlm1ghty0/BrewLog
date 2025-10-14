@@ -30,6 +30,7 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
   String _drinkType = 'Pint';
   late TextEditingController _volumeController;
   late TextEditingController _abvController;
+  final TextEditingController _locationController = TextEditingController();
 
   @override
   void initState() {
@@ -44,6 +45,7 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
   void dispose() {
     _volumeController.dispose();
     _abvController.dispose();
+    _locationController.dispose();
     super.dispose();
   }
 
@@ -89,6 +91,10 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
                 keyboardType: TextInputType.number,
                 onChanged: (_) => setState(() {}),
               ),
+              TextFormField(
+                controller: _locationController,
+                decoration: const InputDecoration(labelText: "Location (optional)"),
+              ),
               const SizedBox(height: 20),
               Text("Units: ${_units.toStringAsFixed(2)}"),
               const Spacer(),
@@ -101,7 +107,9 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
                       volume: _volume,
                       abv: _abv,
                       units: _units,
-                      location: null,
+                      location: _locationController.text.isNotEmpty
+                          ? _locationController.text
+                          : null,
                     );
                     Navigator.pop(context, entry);
                   }
