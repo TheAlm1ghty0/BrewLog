@@ -64,7 +64,7 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
           child: Column(
             children: [
               DropdownButtonFormField<String>(
-                value: _drinkType,
+                initialValue: _drinkType,
                 items: _defaultVolumes.keys.map((drink) {
                   return DropdownMenuItem(value: drink, child: Text(drink));
                 }).toList(),
