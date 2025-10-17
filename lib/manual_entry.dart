@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'models/drink_entry.dart';
+import 'models/drink_entry.dart'; // Ensures we use the one, correct DrinkEntry model
 
 class ManualEntryScreen extends StatefulWidget {
-  const ManualEntryScreen({super.key});
+  final String currentUserName; // Accepts the user's name automatically
+
+  const ManualEntryScreen({super.key, required this.currentUserName});
 
   @override
   State<ManualEntryScreen> createState() => _ManualEntryScreenState();
@@ -64,17 +66,19 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
           child: Column(
             children: [
               DropdownButtonFormField<String>(
-                initialValue: _drinkType,
+                value: _drinkType,
                 items: _defaultVolumes.keys.map((drink) {
                   return DropdownMenuItem(value: drink, child: Text(drink));
                 }).toList(),
                 onChanged: (val) {
                   setState(() {
-                    _drinkType = val!;
-                    _volumeController.text =
-                        _defaultVolumes[_drinkType]!.toString();
-                    _abvController.text =
-                        _defaultAbv[_drinkType]!.toString();
+                    if (val != null) {
+                      _drinkType = val;
+                      _volumeController.text =
+                          _defaultVolumes[_drinkType]?.toString() ?? '';
+                      _abvController.text =
+                          _defaultAbv[_drinkType]?.toString() ?? '';
+                    }
                   });
                 },
                 decoration: const InputDecoration(labelText: "Drink Type"),
@@ -100,9 +104,10 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
               const Spacer(),
               ElevatedButton(
                 onPressed: () {
-                  if (_formKey.currentState!.validate()) {
+                  if (_formKey.currentState?.validate() ?? false) {
                     final entry = DrinkEntry(
                       timestamp: DateTime.now(),
+                      userName: widget.currentUserName, // Uses the passed-in username
                       type: _drinkType,
                       volume: _volume,
                       abv: _abv,
@@ -123,3 +128,4 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
     );
   }
 }
+

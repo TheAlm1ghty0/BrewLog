@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'models/drink_entry.dart';
+import '../models/drink_entry.dart';
 
 class LeaderboardScreen extends StatelessWidget {
   final List<DrinkEntry> drinks;
@@ -19,7 +19,6 @@ class LeaderboardScreen extends StatelessWidget {
       return const Center(child: Text("No drinks logged yet"));
     }
 
-    // Since DrinkEntry has no user field yet, just show overall totals
     final totalDrinks = drinks.length;
     final totalVolume = drinks.fold<double>(0, (sum, e) => sum + e.volume);
     final totalUnits = drinks.fold<double>(0, (sum, e) => sum + e.units);

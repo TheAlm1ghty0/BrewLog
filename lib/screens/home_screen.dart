@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:animated_notch_bottom_bar/animated_notch_bottom_bar/animated_notch_bottom_bar.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import 'models/drink_entry.dart';
-import 'manual_entry.dart';
+import '../models/drink_entry.dart';
+import '../manual_entry.dart';
 import 'leaderboard_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -18,33 +20,72 @@ class _HomeScreenState extends State<HomeScreen> {
   final NotchBottomBarController _barController =
   NotchBottomBarController(index: 0);
 
-  final List<DrinkEntry> _drinks = [];
-  int _lastNonAddIndex = 0; // remember last non-add tab
+  List<DrinkEntry> _drinks = [];
+  int _lastNonAddIndex = 0;
+
+  // Placeholder for the logged-in user's identity.
+  // This will be replaced by a real authentication system later.
+  final String _currentUserName = "Oscar";
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDrinks(); // Load drinks from local storage on app start
+  }
+
+  // --- Local Storage Methods ---
+
+  Future<void> _saveDrinks() async {
+    final prefs = await SharedPreferences.getInstance();
+    // Convert the list of DrinkEntry objects to a list of JSON maps, then encode to a string
+    final String encodedData = jsonEncode(
+      _drinks.map((drink) => drink.toJson()).toList(),
+    );
+    await prefs.setString('drinks_data', encodedData);
+  }
+
+  Future<void> _loadDrinks() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? encodedData = prefs.getString('drinks_data');
+    if (encodedData != null) {
+      // Decode the string back to a list of JSON maps, then create DrinkEntry objects
+      final List<dynamic> decodedData = jsonDecode(encodedData);
+      if (mounted) {
+        setState(() {
+          _drinks = decodedData.map((item) => DrinkEntry.fromJson(item)).toList();
+        });
+      }
+    }
+  }
+
+  // --- UI and Navigation Methods ---
 
   int get _currentIndex => _barController.index;
 
   Future<void> _onTabChanged(int index) async {
     if (index != 1) {
-      _lastNonAddIndex = index; // remember last non-add
+      _lastNonAddIndex = index;
     }
 
-    _barController.index = index;
-    setState(() {});
+    if(mounted) {
+      setState(() {
+        _barController.index = index;
+      });
+    }
 
     if (index == 1) {
-      // Wait for notch animation
       await Future.delayed(const Duration(milliseconds: 300));
       await _showAddDrinkMenu();
 
-      // After closing, return to last non-add page
       if (mounted) {
-        _barController.index = _lastNonAddIndex;
+        setState(() {
+          _barController.index = _lastNonAddIndex;
+        });
         _pageController.animateToPage(
           _lastNonAddIndex == 0 ? 0 : 1,
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOut,
         );
-        setState(() {});
       }
     } else {
       _pageController.animateToPage(
@@ -65,17 +106,19 @@ class _HomeScreenState extends State<HomeScreen> {
               leading: const Icon(Icons.edit),
               title: const Text('Manual Entry'),
               onTap: () async {
-                Navigator.pop(context); // close sheet
+                Navigator.pop(context);
                 final result = await Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const ManualEntryScreen(),
+                    // Pass the current user's name to the entry screen
+                    builder: (context) => ManualEntryScreen(currentUserName: _currentUserName),
                   ),
                 );
                 if (result != null && result is DrinkEntry) {
                   setState(() {
                     _drinks.add(result);
                   });
+                  await _saveDrinks(); // Save the updated list to local storage
                 }
               },
             ),
@@ -119,19 +162,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   IconData _iconForDrink(String type) {
     final t = type.toLowerCase();
-    if (t.contains('pint') || t.contains('can')){
-        return Icons.sports_bar;
-    }
-    else if (t.contains('wine')){
+    if (t.contains('pint') || t.contains('can')) {
+      return Icons.sports_bar;
+    } else if (t.contains('wine')) {
       return Icons.wine_bar;
-    }
-    else if (t.contains('cocktail')) {
+    } else if (t.contains('cocktail') || t.contains('shot')) {
       return Icons.local_bar;
-    }
-    else if (t.contains('shot')) {
-      return Icons.local_bar;
-    }
-    else {
+    } else {
       return Icons.local_drink;
     }
   }
@@ -147,13 +184,20 @@ class _HomeScreenState extends State<HomeScreen> {
       body: PageView(
         controller: _pageController,
         onPageChanged: (index) {
-          _barController.index = index == 0 ? 0 : 2;
-          _lastNonAddIndex = _barController.index;
-          setState(() {});
+          if (mounted) {
+            setState(() {
+              _barController.index = index == 0 ? 0 : 2;
+              _lastNonAddIndex = _barController.index;
+            });
+          }
         },
         children: [
           LeaderboardScreen(drinks: _drinks),
-          DrinkListView(drinks: _drinks, iconForDrink: _iconForDrink),
+          DrinkListView(
+            drinks: _drinks,
+            iconForDrink: _iconForDrink,
+            currentUserName: _currentUserName,
+          ),
         ],
       ),
       extendBody: true,
@@ -195,11 +239,13 @@ class _HomeScreenState extends State<HomeScreen> {
 class DrinkListView extends StatefulWidget {
   final List<DrinkEntry> drinks;
   final IconData Function(String) iconForDrink;
+  final String currentUserName;
 
   const DrinkListView({
     super.key,
     required this.drinks,
     required this.iconForDrink,
+    required this.currentUserName,
   });
 
   @override
@@ -207,16 +253,32 @@ class DrinkListView extends StatefulWidget {
 }
 
 class _DrinkListViewState extends State<DrinkListView> {
-
   final Map<String, bool> _expanded = {};
-  bool _showLitres = false; // toggle for total volume display
+  bool _showLitres = false;
 
   @override
   void initState() {
     super.initState();
-    final totalVolume = widget.drinks.fold<double>(0, (sum, e) => sum + e.volume);
+    _checkTotalVolume();
+  }
+
+  @override
+  void didUpdateWidget(DrinkListView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.drinks.length != oldWidget.drinks.length) {
+      _checkTotalVolume();
+    }
+  }
+
+  void _checkTotalVolume() {
+    final myDrinks = widget.drinks.where((d) => d.userName == widget.currentUserName).toList();
+    final totalVolume = myDrinks.fold<double>(0, (sum, e) => sum + e.volume);
     if (totalVolume >= 1000) {
-      _showLitres = true;
+      if (!_showLitres) {
+        if(mounted){
+          setState(() => _showLitres = true);
+        }
+      }
     }
   }
 
@@ -229,18 +291,15 @@ class _DrinkListViewState extends State<DrinkListView> {
   }
 
   String _formatItemVolume(double ml) {
-    // Always show items >= 1000ml in litres
     return ml >= 1000
         ? "${(ml / 1000).toStringAsFixed(2)} L"
         : "${ml.toStringAsFixed(0)} ml";
   }
 
-  Widget _buildSummaryRow() {
-    final totalDrinks = widget.drinks.length;
-    final totalVolume =
-    widget.drinks.fold<double>(0, (sum, e) => sum + e.volume);
-    final totalUnits =
-    widget.drinks.fold<double>(0, (sum, e) => sum + e.units);
+  Widget _buildSummaryRow(List<DrinkEntry> myDrinks) {
+    final totalDrinks = myDrinks.length;
+    final totalVolume = myDrinks.fold<double>(0, (sum, e) => sum + e.volume);
+    final totalUnits = myDrinks.fold<double>(0, (sum, e) => sum + e.units);
 
     Widget stat(IconData icon, String label, String value,
         {VoidCallback? onTap}) {
@@ -265,9 +324,11 @@ class _DrinkListViewState extends State<DrinkListView> {
         children: [
           stat(Icons.local_drink, "Drinks", "$totalDrinks"),
           stat(Icons.water_drop, "Volume", _formatVolume(totalVolume), onTap: () {
-            setState(() {
-              _showLitres = !_showLitres;
-            });
+            if(mounted){
+              setState(() {
+                _showLitres = !_showLitres;
+              });
+            }
           }),
           stat(Icons.calculate, "Units", totalUnits.toStringAsFixed(2)),
         ],
@@ -277,45 +338,47 @@ class _DrinkListViewState extends State<DrinkListView> {
 
   @override
   Widget build(BuildContext context) {
-    // Show empty state with summary row (totals work even if zero)
-    if (widget.drinks.isEmpty) {
+    // Filter drinks for the current user to display on "My Drinks"
+    final myDrinks = widget.drinks.where((d) => d.userName == widget.currentUserName).toList();
+
+    if (myDrinks.isEmpty) {
       return Column(
         children: [
-          _buildSummaryRow(),
+          _buildSummaryRow(myDrinks), // Pass empty list to show 0s
           const Expanded(
-            child: Center(child: Text("No drinks logged yet")),
+            child: Center(child: Text("You haven't logged any drinks yet")),
           ),
         ],
       );
     }
 
-    // Group drinks by date
     final Map<String, List<DrinkEntry>> grouped = {};
-    for (var d in widget.drinks) {
+    for (var d in myDrinks) {
       final dateKey = DateFormat('yyyy-MM-dd').format(d.timestamp.toLocal());
       grouped.putIfAbsent(dateKey, () => []).add(d);
     }
 
-    // Sort dates newest first
     final sortedDates = grouped.keys.toList()
       ..sort((a, b) => b.compareTo(a));
 
     return Column(
       children: [
-        _buildSummaryRow(),
+        _buildSummaryRow(myDrinks), // Pass filtered list for correct totals
         Expanded(
           child: RefreshIndicator(
             onRefresh: () async {
+              // In the future, this would fetch from the server
               await Future.delayed(const Duration(milliseconds: 500));
             },
             child: ListView.builder(
-              padding: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.only(top: 8, bottom: 80),
               itemCount: sortedDates.length,
               itemBuilder: (context, index) {
                 final dateKey = sortedDates[index];
-                final entries = grouped[dateKey]!;
+                final entries = grouped[dateKey];
 
-                // Sort entries newest first
+                if (entries == null || entries.isEmpty) return const SizedBox.shrink();
+
                 entries.sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
                 final totalUnits =
@@ -331,9 +394,11 @@ class _DrinkListViewState extends State<DrinkListView> {
                   key: PageStorageKey(dateKey),
                   initiallyExpanded: _expanded[dateKey] ?? true,
                   onExpansionChanged: (expanded) {
-                    setState(() {
-                      _expanded[dateKey] = expanded;
-                    });
+                    if(mounted){
+                      setState(() {
+                        _expanded[dateKey] = expanded;
+                      });
+                    }
                   },
                   title: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -384,3 +449,4 @@ class _DrinkListViewState extends State<DrinkListView> {
     );
   }
 }
+
