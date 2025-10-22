@@ -30,30 +30,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final String password = _passwordController.text;
 
     try {
-      // Step 1: Register the new user
       await widget.authService.register(username, password);
-
-      // Step 2: Immediately log the user in
       await widget.authService.login(username, password);
 
-      // Step 3: Update the auth provider to trigger navigation to HomeScreen
       if (mounted) {
-        Provider.of<AuthProvider>(context, listen: false).login();
-        // Pop all screens until we're back at the root (AuthCheck)
+        Provider.of<AuthProvider>(context, listen: false).login(username);
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } catch (e) {
-      // If anything fails, show an error message
       if (mounted) {
+        final colorScheme = Theme.of(context).colorScheme;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString().replaceFirst('Exception: ', '')),
-            backgroundColor: Colors.red,
+            content: Text(
+              e.toString().replaceFirst('Exception: ', ''),
+              style: TextStyle(color: colorScheme.onError),
+            ),
+            backgroundColor: colorScheme.error,
           ),
         );
       }
     } finally {
-      // Always stop the loading indicator
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -75,7 +72,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
             children: [
               TextFormField(
                 controller: _usernameController,
-                decoration: const InputDecoration(labelText: 'Username'),
+                decoration: const InputDecoration(
+                  labelText: 'Username',
+                  border: OutlineInputBorder(),
+                ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter a username';
@@ -86,7 +86,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _passwordController,
-                decoration: const InputDecoration(labelText: 'Password'),
+                decoration: const InputDecoration(
+                  labelText: 'Password',
+                  border: OutlineInputBorder(),
+                ),
                 obscureText: true,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -112,4 +115,3 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 }
-

@@ -1,42 +1,35 @@
 class DrinkEntry {
+  final int? id; // The unique ID from the database
   final DateTime timestamp;
   final String type;
   final double volume;
   final double abv;
   final double units;
-  final String userName; // Automatically attached, not manually entered
+  final String userName;
   final String? location;
 
   DrinkEntry({
+    this.id,
     required this.timestamp,
     required this.type,
     required this.volume,
     required this.abv,
     required this.units,
-    required this.userName, // Will be passed from the "logged-in" user state
+    required this.userName,
     this.location,
   });
 
-  // Method to convert a DrinkEntry object into a JSON map for local storage
-  Map<String, dynamic> toJson() => {
-    'timestamp': timestamp.toIso8601String(),
-    'type': type,
-    'volume': volume,
-    'abv': abv,
-    'units': units,
-    'userName': userName,
-    'location': location,
-  };
-
-  // Factory constructor to create a DrinkEntry object from a JSON map
-  factory DrinkEntry.fromJson(Map<String, dynamic> json) => DrinkEntry(
-    timestamp: DateTime.parse(json['timestamp']),
-    type: json['type'],
-    volume: json['volume'],
-    abv: json['abv'],
-    units: json['units'],
-    userName: json['userName'],
-    location: json['location'],
-  );
+  // Factory constructor to parse the API response
+  factory DrinkEntry.fromJson(Map<String, dynamic> json) {
+    return DrinkEntry(
+      id: json['id'],
+      timestamp: DateTime.parse(json['timestamp']),
+      type: json['type'],
+      volume: (json['volume'] as num).toDouble(),
+      abv: (json['abv'] as num).toDouble(),
+      units: (json['units'] as num).toDouble(),
+      userName: json['owner']['username'], // Extract from nested owner object
+      location: json['location'],
+    );
+  }
 }
-

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
-import 'providers/auth_provider.dart'; // Import the new provider file
+import 'providers/auth_provider.dart';
 
 void main() {
   runApp(
@@ -13,18 +13,33 @@ void main() {
   );
 }
 
-// AuthProvider class has been moved to lib/providers/auth_provider.dart
-
 class DrinkTrackerApp extends StatelessWidget {
   const DrinkTrackerApp({super.key});
 
   @override
   Widget build(BuildContext context) {
+    // Define a single seed color that will generate our entire color palette.
+    // This is the value we will change later with the Huemint API.
+    const Color seedColor = Colors.deepPurple;
+
     return MaterialApp(
       title: 'Drink Tracker',
-      theme: ThemeData.light(),
-      darkTheme: ThemeData.dark(),
-      themeMode: ThemeMode.dark,
+      // --- Material 3 Theme Setup ---
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: seedColor,
+          brightness: Brightness.light,
+        ),
+        useMaterial3: true,
+      ),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: seedColor,
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
+      ),
+      themeMode: ThemeMode.dark, // We are keeping dark mode as the default
       home: const AuthCheck(),
     );
   }
@@ -57,4 +72,3 @@ class _AuthCheckState extends State<AuthCheck> {
     );
   }
 }
-
