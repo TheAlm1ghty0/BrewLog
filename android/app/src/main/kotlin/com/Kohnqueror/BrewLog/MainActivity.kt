@@ -1,4 +1,4 @@
-package com.example.drink_leaderboard // (or whatever your package name is)
+package com.Kohnqueror.BrewLog // (or whatever your package name is)
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.plugins.GeneratedPluginRegistrant

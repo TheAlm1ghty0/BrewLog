@@ -1,86 +1,93 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import 'package:local_auth/local_auth.dart'; // Import local_auth
+import 'package:shared_preferences/shared_preferences.dart'; // Import shared_preferences
 
 class AuthProvider with ChangeNotifier {
-  final AuthService _authService = AuthService();
+  // Pass LocalAuthentication instance to AuthService
+  final AuthService _authService = AuthService(LocalAuthentication());
   bool _isAuthenticated = false;
   String? _username;
-
-  // --- NEW BIOMETRIC STATE ---
-  /// Does the device hardware support biometrics?
-  bool _isBiometricsSupported = false;
-  /// Has the user *enabled* biometrics in the app?
-  bool _isBiometricsEnabled = false;
+  bool _isBiometricsGloballyEnabled = false; // Add state for biometric preference
 
   bool get isAuthenticated => _isAuthenticated;
   String? get username => _username;
-  /// Use this to show/hide the "Enable Biometric Login" option.
-  bool get isBiometricsSupported => _isBiometricsSupported;
-  /// Use this to know if you should *try* to log in with biometrics.
-  bool get isBiometricsEnabled => _isBiometricsEnabled;
+  bool get isBiometricsGloballyEnabled => _isBiometricsGloballyEnabled; // Getter
 
-  /// Checks for a valid token AND loads biometric status.
+  AuthProvider() {
+    // Load biometric preference on initialization
+    _loadBiometricPreference();
+  }
+
+  Future<void> _loadBiometricPreference() async {
+    _isBiometricsGloballyEnabled = await _authService.isBiometricsEnabled();
+    notifyListeners(); // Notify after loading initial preference
+  }
+
   Future<void> checkAuth() async {
     final validatedUsername = await _authService.verifyTokenAndGetUser();
 
     if (validatedUsername != null) {
       _isAuthenticated = true;
       _username = validatedUsername;
-
-      // --- NEW: Check biometric status on auth ---
-      _isBiometricsSupported = await _authService.isBiometricsSupported();
-      _isBiometricsEnabled = await _authService.isBiometricsEnabled();
-
+      await _loadBiometricPreference(); // Ensure preference is loaded on auth check
     } else {
-      await _authService.deleteLocalTokens();
+      // Don't call full logout here, just clear provider state
       _isAuthenticated = false;
       _username = null;
-
-      // --- NEW: Clear biometric status on logout ---
-      _isBiometricsSupported = false;
-      _isBiometricsEnabled = false;
+      _isBiometricsGloballyEnabled = false; // Reset if auth check fails
+      // We don't necessarily need to delete local tokens here,
+      // as they might be needed for biometric login on next launch.
+      // Let the login screen handle attempting biometric login if enabled.
     }
     notifyListeners();
   }
 
-  /// Called after a successful username/password login.
+
   void login(String username) {
     _isAuthenticated = true;
     _username = username;
-
-    // --- NEW: Check biometric support on login ---
-    _authService.isBiometricsSupported().then((isSupported) {
-      _isBiometricsSupported = isSupported;
-      notifyListeners();
-    });
-
+    // Load preference *after* successful login if needed, or rely on checkAuth post-restart
+    _loadBiometricPreference(); // Ensure state reflects stored pref after login
     notifyListeners();
   }
 
-  // --- NEW: Method to enable/disable biometrics ---
-  /// Call this from your settings screen or a popup after login.
-  Future<void> setBiometricsEnabled(bool isEnabled) async {
-    await _authService.setBiometricsEnabled(isEnabled);
-    _isBiometricsEnabled = isEnabled;
-    notifyListeners();
-  }
-
-  /// Logs the user out from the server and clears all local state.
+  // Make logout async to handle API call and token deletion
   Future<void> logout() async {
-    final refreshToken = await _authService.getRefreshToken();
-    if (refreshToken != null) {
-      await _authService.logout(refreshToken); // Call API logout
-    }
-    await _authService.deleteLocalTokens(); // Clear local tokens
-
-    // --- NEW: Clear all state on logout ---
+    await _authService.logout(); // Calls AuthService.logout() which ONLY deletes access token now
     _isAuthenticated = false;
-    _username = null;
-    _isBiometricsSupported = false;
-    _isBiometricsEnabled = false;
-    // Also clear the preference in storage
-    await _authService.setBiometricsEnabled(false);
-
+    _username = null; // Clear username in provider state
+    // _isBiometricsGloballyEnabled = false; // REMOVED: Do NOT reset preference on manual logout
     notifyListeners();
   }
+
+
+  // Method to update biometric preference
+  Future<void> setBiometricPreference(bool enabled) async {
+    if (enabled) {
+      // Check if device actually supports it before enabling
+      bool supported = await _authService.isDeviceSupported();
+      bool canCheck = await _authService.canCheckBiometrics();
+      if (supported && canCheck) {
+        await _authService.enableBiometrics();
+        _isBiometricsGloballyEnabled = true;
+      } else {
+        // Optionally show an error if trying to enable on unsupported device
+        print("Attempted to enable biometrics on unsupported device.");
+        _isBiometricsGloballyEnabled = false; // Ensure state remains false
+        // Keep the stored preference false as well
+        await _authService.disableBiometrics();
+
+      }
+    } else {
+      await _authService.disableBiometrics();
+      _isBiometricsGloballyEnabled = false;
+    }
+    notifyListeners();
+  }
+
+
+  // Expose AuthService if needed by other parts, like SettingsScreen
+  // (Be cautious about exposing the entire service)
+  AuthService get authService => _authService;
 }
