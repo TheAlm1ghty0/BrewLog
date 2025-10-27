@@ -1,4 +1,4 @@
-# drink_leaderboard
+# BrewLog
 
 A new Flutter project.
 
