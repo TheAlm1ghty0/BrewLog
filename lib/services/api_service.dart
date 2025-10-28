@@ -2,9 +2,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart'; // Added for 'Color' object
 import 'package:http/http.dart' as http; // Ensure http is imported
 import 'dart:async'; // Added for FutureOr, Future, Completer
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+// import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/leaderboard.dart';
 import '../models/drink_entry.dart';
+import '../models/cocktail.dart'; // <<<<<<<<<< IMPORT NEW MODEL
 import 'auth_service.dart'; // Added for SessionExpiredException and AuthService
 // --- Corrected Import ---
 import 'package:http_interceptor/http_interceptor.dart'; // Defines InterceptorContract
@@ -222,7 +223,7 @@ class AuthInterceptor implements InterceptorContract {
 
 class ApiService {
   final String _baseUrl = "https://api.oscarkohn.com";
-  final _storage = const FlutterSecureStorage();
+  // final _storage = const FlutterSecureStorage();
 
   // Use the interceptor client for all requests
   final http.Client client = InterceptedClient.build(
@@ -300,7 +301,6 @@ class ApiService {
     return LeaderboardDetail.fromJson(json.decode(response.body));
   }
 
-  // REVERTED: Re-added startDate parameter
   Future<Leaderboard> createLeaderboard({
     required String name,
     required DateTime startDate, // RE-ADDED
@@ -325,7 +325,6 @@ class ApiService {
     ));
     return Leaderboard.fromJson(json.decode(response.body));
   }
-  // --- END REVERSION ---
 
 
   Future<void> joinLeaderboard(String inviteCode) async {
@@ -360,20 +359,23 @@ class ApiService {
     return jsonResponse.map((drink) => DrinkEntry.fromJson(drink)).toList();
   }
 
+  // --- UPDATED: addDrink ---
   Future<void> addDrink(DrinkEntry drink) async {
     await _handleResponse(() => client.post(
       Uri.parse('$_baseUrl/drinks/'),
       headers: _getJsonHeaders(), // Explicitly set Content-Type header
       body: jsonEncode({
         'type': drink.type,
+        'name': drink.name, // <<<<<<<<<< ADDED NAME
         'volume': drink.volume,
         'abv': drink.abv,
         'units': drink.units,
         'location': drink.location,
-        // 'timestamp': drink.timestamp.toIso8601String(), // REMOVED
+        // 'timestamp': drink.timestamp.toIso8601String(), // Timestamp is server-generated
       }),
     ));
   }
+  // --- END UPDATE ---
 
   Future<void> updateUsername(String newUsername) async {
     await _handleResponse(() => client.put(
@@ -397,7 +399,7 @@ class ApiService {
     ));
   }
 
-  Future<void> deleteDrink(int? drinkId) async { // Allow null ID temporarily
+  Future<void> deleteDrink(int? drinkId) async {
     if (drinkId == null) {
       print("Error: Attempted to delete drink with null ID.");
       throw Exception("Cannot delete drink without an ID.");
@@ -448,4 +450,14 @@ class ApiService {
       throw Exception('Failed to load AI palette: Network error or invalid response.');
     }
   }
+
+  // --- NEW: getCocktails ---
+  Future<List<Cocktail>> getCocktails() async {
+    final response = await _handleResponse(() => client.get(
+      Uri.parse('$_baseUrl/cocktails/'),
+    ));
+    List jsonResponse = json.decode(response.body);
+    return jsonResponse.map((cocktail) => Cocktail.fromJson(cocktail)).toList();
+  }
+// --- END NEW ---
 }

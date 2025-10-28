@@ -14,7 +14,22 @@ class _JoinLeaderboardScreenState extends State<JoinLeaderboardScreen> {
   final ApiService _apiService = ApiService();
   final _codeController = TextEditingController(); // Renamed from _linkController
   bool _isProcessing = false;
-  // No longer need instance for static method: final Uuid _uuid = const Uuid();
+  // --- ADDED: Scanner Controller ---
+  final MobileScannerController _scannerController = MobileScannerController(
+    facing: CameraFacing.back,
+    torchEnabled: false,
+  );
+  // --- END ADDED ---
+
+  @override
+  void dispose() {
+    // --- ADDED: Dispose controller ---
+    _scannerController.dispose();
+    _codeController.dispose();
+    // --- END ADDED ---
+    super.dispose();
+  }
+
 
   // Handles processing input from QR scan or text field
   void _processJoinInput(String? input) {
@@ -36,9 +51,7 @@ class _JoinLeaderboardScreenState extends State<JoinLeaderboardScreen> {
 
     }
     // Check if it's potentially just a UUID (likely from manual input)
-    // --- FIX: Call static method directly on the class ---
     else if (Uuid.isValidUUID(fromString: trimmedInput)) { // Use validator
-      // --- END FIX ---
       inviteCode = trimmedInput; // It's already the code
     }
     // Otherwise, it's invalid
@@ -49,10 +62,7 @@ class _JoinLeaderboardScreenState extends State<JoinLeaderboardScreen> {
 
     // If we extracted a valid-looking code, attempt to join
     if (inviteCode != null && inviteCode.isNotEmpty) {
-      // Validate UUID format again just to be sure before API call
-      // --- FIX: Call static method directly on the class ---
       if (Uuid.isValidUUID(fromString: inviteCode)) {
-        // --- END FIX ---
         setState(() => _isProcessing = true);
         _joinLeaderboard(inviteCode);
       } else {
@@ -67,7 +77,6 @@ class _JoinLeaderboardScreenState extends State<JoinLeaderboardScreen> {
 
   // Calls the API with the extracted invite code (UUID string)
   Future<void> _joinLeaderboard(String code) async {
-    // Use local context variable
     final currentContext = context;
     if (!currentContext.mounted) return;
 
@@ -75,32 +84,37 @@ class _JoinLeaderboardScreenState extends State<JoinLeaderboardScreen> {
     final navigator = Navigator.of(currentContext);
 
     try {
-      await _apiService.joinLeaderboard(code); // API expects just the code string
+      await _apiService.joinLeaderboard(code);
 
-      // Check mounted after await
       if (!currentContext.mounted) return;
 
       scaffoldMessenger.showSnackBar(
         const SnackBar(content: Text('Successfully joined leaderboard!'), backgroundColor: Colors.green),
       );
+
+      // --- FIX: Stop camera BEFORE popping ---
+      await _scannerController.stop();
+      // --- END FIX ---
+
       navigator.pop(true); // Pop and signal success
     } catch (e) {
-      print("Error joining leaderboard: $e"); // Log full error
-      // Check mounted before showing error
+      print("Error joining leaderboard: $e");
       if (currentContext.mounted) {
         _showError('Failed to join leaderboard: ${e.toString().replaceFirst('Exception: ', '')}');
       }
     } finally {
       // Ensure processing state is reset if still mounted
-      if (mounted) { // Use general mounted here
+      if (mounted) {
         setState(() => _isProcessing = false);
+        // Ensure camera is stopped even if API call fails
+        // (though stopping it again if already stopped is fine)
+        _scannerController.stop();
       }
     }
   }
 
   // Shows an error message SnackBar
   void _showError(String message) {
-    // Use local context variable
     final currentContext = context;
     if (!currentContext.mounted) return;
 
@@ -111,8 +125,6 @@ class _JoinLeaderboardScreenState extends State<JoinLeaderboardScreen> {
         backgroundColor: colorScheme.errorContainer,
       ),
     );
-    // No longer need delayed state reset here, _joinLeaderboard handles it in finally
-    // Future.delayed(const Duration(seconds: 2), () { ... });
   }
 
   @override
@@ -121,23 +133,21 @@ class _JoinLeaderboardScreenState extends State<JoinLeaderboardScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Join Leaderboard')),
-      body: Stack( // Use Stack to overlay loading indicator
+      body: Stack(
         children: [
           Column(
             children: [
               // --- QR Scanner Section ---
               Expanded(
-                child: ClipRRect( // Clip scanner view if needed
-                  // borderRadius: BorderRadius.circular(12), // Optional styling
+                child: ClipRRect(
                   child: MobileScanner(
-                    // Fit camera feed
+                    // --- ADDED: Pass controller ---
+                    controller: _scannerController,
+                    // --- END ADDED ---
                     fit: BoxFit.cover,
-                    // Controller recommended for more control (start/stop/torch)
-                    // controller: MobileScannerController(facing: CameraFacing.back),
                     onDetect: (capture) {
-                      // Process the *first* barcode found
                       final String? codeValue = capture.barcodes.first.rawValue;
-                      print("QR Scan detected: $codeValue"); // Log scanned value
+                      print("QR Scan detected: $codeValue");
                       _processJoinInput(codeValue);
                     },
 
@@ -157,19 +167,16 @@ class _JoinLeaderboardScreenState extends State<JoinLeaderboardScreen> {
                       decoration: const InputDecoration(
                         labelText: 'Invite Code',
                         border: OutlineInputBorder(),
-                        hintText: 'e.g., a1b2c3d4-e5f6...', // Add hint
+                        hintText: 'e.g., a1b2c3d4-e5f6...',
                       ),
-                      // Validate input length/format roughly? UUID has fixed length.
-                      // inputFormatters: [LengthLimitingTextInputFormatter(36)], // UUID length
                     ),
                     const SizedBox(height: 12),
                     ElevatedButton.icon(
                       icon: const Icon(Icons.group_add),
                       label: const Text('Join with Code'),
                       style: ElevatedButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 45), // Make button wider
+                        minimumSize: const Size(double.infinity, 45),
                       ),
-                      // Disable button while processing
                       onPressed: _isProcessing ? null : () => _processJoinInput(_codeController.text),
                     ),
                   ],

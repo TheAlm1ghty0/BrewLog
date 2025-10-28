@@ -935,10 +935,20 @@ class _DrinkListViewState extends State<DrinkListView> {
                 child: ListTile(
                   onLongPress: () => _handleDeleteDrink(drink), // Enable delete on long press
                   leading: Icon(widget.iconForDrink(drink.type), color: Theme.of(context).colorScheme.primary),
-                  title: Text("${drink.type} - ${_formatItemVolume(drink.volume)}"),
+
+                  // --- MODIFICATION: Show name or type ---
+                  title: Text(
+                      drink.name != null && drink.name!.isNotEmpty
+                          ? drink.name!
+                          : drink.type
+                  ),
+                  // --- END MODIFICATION ---
+
                   subtitle: Text(
-                    "${drink.abv.toStringAsFixed(1)}% • ${drink.units.toStringAsFixed(2)} units • $formattedTime"
-                        "${drink.location != null && drink.location!.isNotEmpty ? "\n@ ${drink.location}" : ""}", // Location on new line if exists
+                    // --- MODIFICATION: Add volume to subtitle ---
+                    "${_formatItemVolume(drink.volume)} • ${drink.abv.toStringAsFixed(1)}% • ${drink.units.toStringAsFixed(2)} units • $formattedTime"
+                    // --- END MODIFICATION ---
+                        "${drink.location != null && drink.location!.isNotEmpty ? "\n${drink.location}" : ""}", // Location on new line if exists
                   ),
                   isThreeLine: drink.location != null && drink.location!.isNotEmpty, // Allow three lines if location present
                   // --- REMOVED trailing: IconButton ---
@@ -1015,4 +1025,3 @@ class _DrinkListViewState extends State<DrinkListView> {
     );
   }
 }
-
