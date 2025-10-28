@@ -187,7 +187,7 @@ class LeaderboardScreen extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildTotalStat(context, Icons.format_list_numbered, '$currentGroupTotalDrinks', 'Drinks'),
+              _buildTotalStat(context, Icons.local_drink_outlined, '$currentGroupTotalDrinks', 'Drinks'),
               _buildTotalStat(context, Icons.water_drop_outlined, _formatVolume(currentGroupTotalVolume), 'Volume'),
               _buildTotalStat(context, Icons.calculate_outlined, currentGroupTotalUnits.toStringAsFixed(1), 'Units'), // Use 1 decimal
             ],

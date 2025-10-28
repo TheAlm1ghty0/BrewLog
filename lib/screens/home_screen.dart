@@ -462,17 +462,11 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     // --- Leaderboard Tab (index 0 -> page 0) ---
     else if (_currentIndex == 0) {
-      // Title includes leaderboard name and status chip
-      titleWidget = Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Flexible(
-            child: Text(
-              _selectedLeaderboard?.name ?? "Leaderboard",
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
+      // Title includes leaderboard name
+      // Removed status chip logic from here
+      titleWidget = Text( // Just use Text directly
+        _selectedLeaderboard?.name ?? "Leaderboard",
+        overflow: TextOverflow.ellipsis,
       );
 
       // Leading: Share button if user is creator
@@ -508,6 +502,7 @@ class _HomeScreenState extends State<HomeScreen> {
       actions: actions,
     );
   }
+
 
   // Helper to get appropriate icon based on drink type string
   IconData _iconForDrink(String type) {
@@ -946,7 +941,7 @@ class _DrinkListViewState extends State<DrinkListView> {
                         "${drink.location != null && drink.location!.isNotEmpty ? "\n@ ${drink.location}" : ""}", // Location on new line if exists
                   ),
                   isThreeLine: drink.location != null && drink.location!.isNotEmpty, // Allow three lines if location present
-                  // REMOVED trailing: IconButton(...)
+                  // --- REMOVED trailing: IconButton ---
                   dense: true, // Make list tiles slightly more compact
                 ),
               );
@@ -1020,3 +1015,4 @@ class _DrinkListViewState extends State<DrinkListView> {
     );
   }
 }
+
