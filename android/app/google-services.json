@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "70496179969",
+    "project_id": "brewlog-60271",
+    "storage_bucket": "brewlog-60271.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:70496179969:android:5e74bfabe116d7438c2d00",
+        "android_client_info": {
+          "package_name": "com.Kohnqueror.BrewLog"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAv5-KWkzBGXQ9IbtbwUWNjV537qrTgNgs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
