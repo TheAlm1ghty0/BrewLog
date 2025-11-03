@@ -359,7 +359,6 @@ class ApiService {
     return jsonResponse.map((drink) => DrinkEntry.fromJson(drink)).toList();
   }
 
-  // --- UPDATED: addDrink ---
   Future<void> addDrink(DrinkEntry drink) async {
     await _handleResponse(() => client.post(
       Uri.parse('$_baseUrl/drinks/'),
@@ -375,7 +374,26 @@ class ApiService {
       }),
     ));
   }
-  // --- END UPDATE ---
+
+  // --- NEW: updateDrink ---
+  Future<DrinkEntry> updateDrink(int drinkId, DrinkEntry drinkData) async {
+    // We send a body matching the DrinkEntryUpdate schema
+    final response = await _handleResponse(() => client.put(
+      Uri.parse('$_baseUrl/drinks/$drinkId'),
+      headers: _getJsonHeaders(),
+      body: jsonEncode({
+        'name': drinkData.name,
+        'type': drinkData.type,
+        'volume': drinkData.volume,
+        'abv': drinkData.abv,
+        'location': drinkData.location,
+        // Units are not sent, they are recalculated on the backend
+      }),
+    ));
+    // The backend returns the full, updated Drink object
+    return DrinkEntry.fromJson(json.decode(response.body));
+  }
+  // --- END NEW ---
 
   Future<void> updateUsername(String newUsername) async {
     await _handleResponse(() => client.put(

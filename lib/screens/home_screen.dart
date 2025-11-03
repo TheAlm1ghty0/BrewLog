@@ -14,6 +14,7 @@ import '../providers/auth_provider.dart';
 import '../services/api_service.dart'; // Ensure ApiService has SessionExpiredException
 import '../models/leaderboard.dart';
 import 'share_leaderboard_screen.dart';
+import 'edit_drink_screen.dart'; // Import edit screen
 
 
 class HomeScreen extends StatefulWidget {
@@ -782,7 +783,7 @@ class _DrinkListViewState extends State<DrinkListView> {
       dialogType: DialogType.warning,
       animType: AnimType.bottomSlide,
       title: 'Delete Drink',
-      desc: 'Delete this ${drink.type} entry?\n(${_formatItemVolume(drink.volume)}, ${drink.abv.toStringAsFixed(1)}%)\nThis action cannot be undone.',
+      desc: 'Delete this ${drink.name ?? drink.type} entry?\n(${_formatItemVolume(drink.volume)}, ${drink.abv.toStringAsFixed(1)}%)\nThis action cannot be undone.', // Use name in desc
       btnCancelOnPress: () {},
       btnOkText: 'Delete',
       btnOkColor: Theme.of(currentContext).colorScheme.error,
@@ -798,7 +799,7 @@ class _DrinkListViewState extends State<DrinkListView> {
           // Check mounted after await before showing SnackBar/refreshing
           if (!localContext.mounted) return;
           scaffoldMessenger.showSnackBar(
-            SnackBar(content: Text('${drink.type} deleted.'), backgroundColor: Colors.green[700]),
+            SnackBar(content: Text('${drink.name ?? drink.type} deleted.'), backgroundColor: Colors.green[700]), // Use name in snackbar
           );
           await widget.onRefresh(); // Trigger data refresh in HomeScreen
         } on SessionExpiredException catch (_) {
@@ -822,6 +823,74 @@ class _DrinkListViewState extends State<DrinkListView> {
     ).show();
   }
   // --- End Drink Deletion ---
+
+  // --- MODIFIED: Show Edit/Delete Menu (showMenu) ---
+  Future<void> _showEditDeleteMenu(BuildContext tileContext, RelativeRect position, DrinkEntry drink) async {
+    // We need the navigator from the main screen's context
+    // but the tileContext should be fine as it's part of the same widget tree
+    final navigator = Navigator.of(context);
+    final theme = Theme.of(context);
+
+    // Get the RenderBox of the overlay to calculate position
+    // final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+
+    await showMenu(
+      context: tileContext, // Use the tile's BuildContext
+      position: position, // Use the calculated RelativeRect
+      items: [
+        // --- Edit Option ---
+        PopupMenuItem(
+          value: 'edit', // Return a value
+          child: const ListTile(
+            leading: Icon(Icons.edit_outlined),
+            title: Text('Edit Drink'),
+            dense: true,
+          ),
+          // onTap: () async { ... }, // onTap in PopupMenuItem doesn't work well with async navigation
+        ),
+        // --- Delete Option ---
+        PopupMenuItem(
+          value: 'delete', // Return a value
+          child: ListTile(
+            leading: Icon(Icons.delete_outline, color: theme.colorScheme.error),
+            title: Text('Delete Drink', style: TextStyle(color: theme.colorScheme.error)),
+            dense: true,
+          ),
+          // onTap: () { ... },
+        ),
+      ],
+      elevation: 8.0,
+      shape: Theme.of(context).cardTheme.shape ?? RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)), // Use theme shape
+    ).then((value) async { // Handle the result *after* the menu closes
+      if (value == null) {
+        // Menu dismissed
+        return;
+      }
+
+      if (value == 'edit') {
+        // Edit Option selected
+        // Wait a frame for the menu to close before navigating
+        await Future.delayed(Duration.zero);
+        if (!mounted) return; // Check mount status
+        final result = await navigator.push(
+          MaterialPageRoute(
+            builder: (context) => EditDrinkScreen(drinkToEdit: drink),
+          ),
+        );
+        // Check mounted after navigation returns
+        if (!mounted) return;
+        // If edit screen returns true, refresh data
+        if (result == true) {
+          widget.onRefresh();
+        }
+      } else if (value == 'delete') {
+        // Delete Option selected
+        // No need to delay, just call the dialog function
+        _handleDeleteDrink(drink);
+      }
+    });
+  }
+  // --- END MODIFICATION ---
 
 
   // Builds the summary row displaying totals
@@ -928,33 +997,58 @@ class _DrinkListViewState extends State<DrinkListView> {
           children: [
             ...entries.map((drink) {
               final formattedTime = DateFormat('HH:mm').format(drink.timestamp.toLocal()); // Only time needed here
+
+              // --- MODIFICATION: Wrap Card in Builder ---
               return Card(
-                // Use themed card color
-                // color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                child: ListTile(
-                  onLongPress: () => _handleDeleteDrink(drink), // Enable delete on long press
-                  leading: Icon(widget.iconForDrink(drink.type), color: Theme.of(context).colorScheme.primary),
+                child: Builder( // Use Builder to get specific context for ListTile
+                    builder: (tileContext) {
+                      return ListTile(
+                        // --- MODIFIED: Use onLongPress and pass context/position ---
+                        onLongPress: () {
+                          // Find the render box and its position
+                          final RenderBox renderBox = tileContext.findRenderObject() as RenderBox;
+                          final Offset offset = renderBox.localToGlobal(Offset.zero); // Get global position
+                          final Size size = renderBox.size;
 
-                  // --- MODIFICATION: Show name or type ---
-                  title: Text(
-                      drink.name != null && drink.name!.isNotEmpty
-                          ? drink.name!
-                          : drink.type
-                  ),
-                  // --- END MODIFICATION ---
+                          // --- YOUR SUGGESTED FIX (modified for valid Rect) ---
+                          // Define a 2px high rect at the bottom of the card, inset by 10%
+                          final Rect anchorRect = Rect.fromLTRB(
+                              offset.dx + (size.width * 0.1), // left: inset 10%
+                              offset.dy + size.height + 2,          // top: at the bottom of the card
+                              offset.dx + (size.width * 0.1) + 1, // right: inset 10% (width 80%)
+                              offset.dy + size.height + 2       // bottom: 2px below the card
+                          );
+                          final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
 
-                  subtitle: Text(
-                    // --- MODIFICATION: Add volume to subtitle ---
-                    "${_formatItemVolume(drink.volume)} • ${drink.abv.toStringAsFixed(1)}% • ${drink.units.toStringAsFixed(2)} units • $formattedTime"
-                    // --- END MODIFICATION ---
-                        "${drink.location != null && drink.location!.isNotEmpty ? "\n${drink.location}" : ""}", // Location on new line if exists
-                  ),
-                  isThreeLine: drink.location != null && drink.location!.isNotEmpty, // Allow three lines if location present
-                  // --- REMOVED trailing: IconButton ---
-                  dense: true, // Make list tiles slightly more compact
+                          _showEditDeleteMenu(
+                              tileContext,
+                              RelativeRect.fromRect(anchorRect, Offset.zero & overlay.size),
+                              drink
+                          );
+                          // --- END YOUR FIX ---
+                        },
+                        // --- END MODIFICATION ---
+                        leading: Icon(widget.iconForDrink(drink.type), color: Theme.of(context).colorScheme.primary),
+                        title: Text(
+                          drink.name != null && drink.name!.isNotEmpty
+                              ? drink.name!
+                              : drink.type, // Fallback to type
+                          style: drink.name != null && drink.name!.isNotEmpty
+                              ? null // Default title style
+                              : TextStyle(fontStyle: FontStyle.italic, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        ),
+                        subtitle: Text(
+                          "${_formatItemVolume(drink.volume)} • ${drink.abv.toStringAsFixed(1)}% • ${drink.units.toStringAsFixed(2)} units • $formattedTime"
+                              "${drink.location != null && drink.location!.isNotEmpty ? "\n@ ${drink.location}" : ""}",
+                        ),
+                        isThreeLine: drink.location != null && drink.location!.isNotEmpty,
+                        dense: true,
+                      );
+                    }
                 ),
               );
+              // --- END MODIFICATION ---
             }),
             const SizedBox(height: 8), // Padding at bottom of group
           ],
@@ -1025,3 +1119,4 @@ class _DrinkListViewState extends State<DrinkListView> {
     );
   }
 }
+
