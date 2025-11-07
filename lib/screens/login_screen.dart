@@ -188,12 +188,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (!currentContext.mounted) return;
     // Don't set loading true for auto-attempt here, _checkBiometrics... handles it
-    if (!isAutoAttempt) {
-      setState(() {
-        _isLoading = true;
-        _errorMessage = null; // Clear previous error
-      });
-    }
+    if (!isAutoAttempt) setState(() {
+      _isLoading = true;
+      _errorMessage = null; // Clear previous error
+    });
 
     final username = await _authService.getUsername();
     final refreshTokenExists = (await _authService.getRefreshToken()) != null;
@@ -367,6 +365,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // --- NEW: Get screen height ---
+    final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
+    // --- END NEW ---
+
     return Scaffold(
       // --- REMOVED AppBar ---
       // appBar: AppBar(title: const Text('Login')),
@@ -379,38 +382,46 @@ class _LoginScreenState extends State<LoginScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch, // Make children stretch
               children: [
-                // --- MODIFIED: App Logo with FittedBox ---
+                // --- MODIFIED: Use screen height percentage ---
                 SizedBox(
-                  height: 240, // Desired display height for the logo
+                  // Use 15% of the screen height for the logo
+                  height: screenHeight * 0.20,
+                  // Constrain width to be a square
+                  width: screenWidth * 0.20,
                   child: ClipRect(
                     child: FittedBox(
-                      fit: BoxFit.cover, // This will "zoom" and crop the image to fill the 120px height
+                      fit: BoxFit.contain, // This will "zoom" and crop the image
                       alignment: Alignment.center,
                       child: Image.asset(
-                        'assets/logo_only.png', // Path to your logo image
-                        // No fit property here, let FittedBox handle it
+                        'assets/inApp_logo.png', // Path to your logo image
                         errorBuilder: (context, error, stackTrace) =>
-                        const Icon(Icons.local_drink, size: 120), // Placeholder
+                            Icon(Icons.local_drink, size: screenHeight * 0.20), // Placeholder
                       ),
                     ),
                   ),
                 ),
                 // --- END MODIFIED ---
                 const SizedBox(height: 16),
-                Image.asset(
-                  'assets/text_only.png', // Path to your app name image
-                  height: 130, // Adjust height as needed
-                  errorBuilder: (context, error, stackTrace) =>
-                      Text(
-                        'BrewLog',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ), // Placeholder
+                // --- MODIFIED: Use screen height percentage ---
+                SizedBox(
+                  // Use 5% of the screen height for the name
+                  height: screenHeight * 0.10,
+                  child: Image.asset(
+                    'assets/text_only.png', // Path to your app name image
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) =>
+                        Text(
+                          'BrewLog',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ), // Placeholder
+                  ),
                 ),
-                const SizedBox(height: 48),
+                // --- END MODIFIED ---
+                SizedBox(height: screenHeight * 0.04), // 4% of screen height for spacing
                 // --- END NEW ---
 
                 TextFormField(

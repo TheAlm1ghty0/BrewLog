@@ -111,6 +111,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // --- NEW: Get screen height ---
+    final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
+    // --- END NEW ---
+
     return Scaffold(
       body: Center( // Center the content
         child: SingleChildScrollView(
@@ -121,36 +126,46 @@ class _RegisterScreenState extends State<RegisterScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // --- App Logo and Name Images (Copied from Login) ---
+                // --- MODIFIED: Use screen height percentage ---
                 SizedBox(
-                  height: 240, // Desired display height for the logo
+                  // Use 15% of the screen height for the logo
+                  height: screenHeight * 0.20,
+                  // Constrain width to be a square
+                  width: screenWidth * 0.20,
                   child: ClipRect(
                     child: FittedBox(
-                      fit: BoxFit.cover, // This will "zoom" and crop the image
+                      fit: BoxFit.contain, // This will "zoom" and crop the image
                       alignment: Alignment.center,
                       child: Image.asset(
-                        'assets/logo_only.png', // Path to your logo image
+                        'assets/inApp_logo.png', // Path to your logo image
                         errorBuilder: (context, error, stackTrace) =>
-                        const Icon(Icons.local_drink, size: 120), // Placeholder
+                            Icon(Icons.local_drink, size: screenHeight * 0.20), // Placeholder
                       ),
                     ),
                   ),
                 ),
+                // --- END MODIFIED ---
                 const SizedBox(height: 16),
-                Image.asset(
-                  'assets/text_only.png', // Path to your app name image
-                  height: 130, // Adjust height as needed
-                  errorBuilder: (context, error, stackTrace) =>
-                      Text(
-                        'BrewLog',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ), // Placeholder
+                // --- MODIFIED: Use screen height percentage ---
+                SizedBox(
+                  // Use 5% of the screen height for the name
+                  height: screenHeight * 0.10,
+                  child: Image.asset(
+                    'assets/text_only.png', // Path to your app name image
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) =>
+                        Text(
+                          'BrewLog',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ), // Placeholder
+                  ),
                 ),
-                const SizedBox(height: 48),
+                // --- END MODIFIED ---
+                SizedBox(height: screenHeight * 0.04), // 4% of screen height
                 // --- END ---
 
                 TextFormField(
@@ -195,6 +210,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.lock_reset_outlined),
                   ),
+
                   obscureText: true,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -224,7 +240,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ),
                 // --- END MODIFICATION ---
-                // const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
                 _isLoading
                     ? const Padding( // Match login screen's loading state
@@ -242,7 +258,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       child: const Text('Register'), // Button text changed
                     ),
                     // --- NEW: Placeholder for Biometrics Button ---
-                    //const SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     Visibility(
                       visible: false, // Not visible on register screen
                       maintainState: true,
@@ -258,7 +274,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ),
                     // --- END NEW ---
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 24),
                     TextButton(
                       onPressed: () {
                         Navigator.of(context).pop(); // Go back to login
