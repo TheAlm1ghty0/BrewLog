@@ -8,6 +8,9 @@ class Leaderboard {
   final double? goalValue;
   final String creatorUsername;
   final String inviteCode;
+  // --- NEW: Add goalMet flag ---
+  final bool goalMet;
+  // --- END NEW ---
 
   Leaderboard({
     required this.id,
@@ -18,6 +21,7 @@ class Leaderboard {
     this.goalValue,
     required this.creatorUsername,
     required this.inviteCode,
+    required this.goalMet, // --- NEW ---
   });
 
   factory Leaderboard.fromJson(Map<String, dynamic> json) {
@@ -30,6 +34,7 @@ class Leaderboard {
       goalValue: (json['goal_value'] as num?)?.toDouble(),
       creatorUsername: json['creator']['username'],
       inviteCode: json['invite_code'],
+      goalMet: json['goal_met'] ?? false, // --- NEW (Parses the value from the API) ---
     );
   }
 }
@@ -40,20 +45,30 @@ class LeaderboardEntry {
   final int totalDrinks;
   final double totalVolume;
   final double totalUnits;
+  final String? profilePictureUrl;
+  final String? title;
 
   LeaderboardEntry({
     required this.username,
     required this.totalDrinks,
     required this.totalVolume,
     required this.totalUnits,
+    this.profilePictureUrl,
+    this.title,
   });
 
   factory LeaderboardEntry.fromJson(Map<String, dynamic> json) {
+    // --- NEW: Add debug print ---
+    print("[DEBUG] Parsing LeaderboardEntry JSON: $json");
+    // --- END NEW ---
+
     return LeaderboardEntry(
       username: json['username'],
       totalDrinks: json['total_drinks'],
       totalVolume: (json['total_volume'] as num).toDouble(),
       totalUnits: (json['total_units'] as num).toDouble(),
+      profilePictureUrl: json['profile_picture_url'],
+      title: json['title'],
     );
   }
 }

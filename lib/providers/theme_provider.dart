@@ -105,26 +105,26 @@ class ThemeProvider with ChangeNotifier {
     }
 
     // 1. Convert ARGB int values to HCT and create TonalPalettes
-    final hctPrimary = Hct.fromInt(_paletteColors[0].value);
+    final hctPrimary = Hct.fromInt(_paletteColors[0].toARGB32());
     final primaryPalette = TonalPalette.of(hctPrimary.hue, hctPrimary.chroma);
 
-    final hctSecondary = Hct.fromInt(_paletteColors[1].value);
+    final hctSecondary = Hct.fromInt(_paletteColors[1].toARGB32());
     final secondaryPalette = TonalPalette.of(hctSecondary.hue, hctSecondary.chroma);
 
-    final hctTertiary = Hct.fromInt(_paletteColors[2].value);
+    final hctTertiary = Hct.fromInt(_paletteColors[2].toARGB32());
     final tertiaryPalette = TonalPalette.of(hctTertiary.hue, hctTertiary.chroma);
 
     // --- REVERTED: Using Option B for Neutrals ---
     // Create neutrals directly from AI colors 4 and 5
-    final hctNeutral = Hct.fromInt(_paletteColors[3].value);
+    final hctNeutral = Hct.fromInt(_paletteColors[3].toARGB32());
     final neutralPalette = TonalPalette.of(hctNeutral.hue, hctNeutral.chroma);
 
-    final hctNeutralVariant = Hct.fromInt(_paletteColors[4].value);
+    final hctNeutralVariant = Hct.fromInt(_paletteColors[4].toARGB32());
     final neutralVariantPalette = TonalPalette.of(hctNeutralVariant.hue, hctNeutralVariant.chroma);
     // --- END Option B ---
 
     // We still need a standard Error palette
-    final errorPalette = CorePalette.of(Colors.red.value).error;
+    final errorPalette = CorePalette.of(Colors.red.toARGB32()).error;
 
 
     // 2. Generate the base ColorSchemes
@@ -260,7 +260,7 @@ class ThemeProvider with ChangeNotifier {
       // Using slightly adjusted base surface/background tones here
       surface: Color(neutral.get(isLight ? 98 : 6)), // Slightly darker light surface, slightly brighter dark surface
       onSurface: Color(neutral.get(isLight ? 10 : 90)),
-      surfaceVariant: Color(neutralVariant.get(isLight ? 90 : 30)), // Standard M3
+      surfaceContainerHighest: Color(neutralVariant.get(isLight ? 90 : 30)), // Standard M3
       onSurfaceVariant: Color(neutralVariant.get(isLight ? 30 : 80)), // Standard M3
 
       outline: Color(neutralVariant.get(isLight ? 50 : 60)),
@@ -270,9 +270,9 @@ class ThemeProvider with ChangeNotifier {
       inverseSurface: Color(neutral.get(isLight ? 20 : 90)),
       onInverseSurface: Color(neutral.get(isLight ? 95 : 20)),
       inversePrimary: Color(primary.get(isLight ? 80 : 40)),
-      background: Color(neutral.get(isLight ? 98 : 6)), // Match adjusted surface
-      onBackground: Color(neutral.get(isLight ? 10 : 90)), // Match adjusted onSurface
-      surfaceTint: Color(primary.get(isLight ? 40 : 80)),
+      // background: Color(neutral.get(isLight ? 98 : 6)), // Match adjusted surface
+      // onBackground: Color(neutral.get(isLight ? 10 : 90)), // Match adjusted onSurface
+      // surfaceTint: Color(primary.get(isLight ? 40 : 80)),
     );
   }
 
@@ -286,7 +286,7 @@ class ThemeProvider with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('theme_mode', _themeMode.index);
     // Save all 5 key colors
-    final colorStrings = _paletteColors.map((c) => c.value.toString()).toList();
+    final colorStrings = _paletteColors.map((c) => c.toARGB32().toString()).toList();
     await prefs.setStringList('palette_colors', colorStrings);
     // Save locks
     final lockStrings = _lockedColors.map((b) => b.toString()).toList();

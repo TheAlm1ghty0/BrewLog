@@ -422,7 +422,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 leading: const Icon(Icons.leaderboard_outlined),
                 title: Text(lb.name, overflow: TextOverflow.ellipsis),
                 selected: lb.id == _selectedLeaderboard?.id, // Highlight selected
-                selectedTileColor: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5),
+                selectedTileColor: Theme.of(context).colorScheme.primaryContainer.withValues(alpha:0.5),
                 onTap: () {
                   Navigator.pop(context); // Close drawer
                   _selectLeaderboard(lb); // Select
@@ -653,7 +653,7 @@ class _HomeScreenState extends State<HomeScreen> {
           // Loading Overlay
           if (_isLoading)
             Container(
-              color: colorScheme.scrim.withOpacity(0.6), // Use scrim color for overlay
+              color: colorScheme.scrim.withValues(alpha:0.6), // Use scrim color for overlay
               child: const Center(
                 child: CircularProgressIndicator(),
               ),

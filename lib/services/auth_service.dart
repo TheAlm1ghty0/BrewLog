@@ -58,8 +58,8 @@ class AuthService {
   }
 
   // --- Token Management ---
-  // MODIFIED: Simplified verifyTokenAndGetUser
-  Future<String?> verifyTokenAndGetUser() async {
+  // --- MODIFIED: Returns Map instead of String ---
+  Future<Map<String, dynamic>?> verifyTokenAndGetUser() async {
     String? token = await getToken();
     if (token == null) {
       print("verifyTokenAndGetUser: No access token found locally.");
@@ -81,7 +81,7 @@ class AuthService {
       // Refresh username in storage just in case it changed via profile update
       await _storage.write(key: 'username', value: username);
       print("verifyTokenAndGetUser: Token verified for user $username");
-      return username;
+      return data; // <-- RETURN FULL USER DATA
     } else {
       // If /users/me fails (e.g., 401), the token is invalid.
       // DO NOT attempt refresh here. Let the interceptor handle it during actual API calls.
@@ -211,8 +211,8 @@ class AuthService {
       return await _localAuth!.authenticate(
         localizedReason: reason,
         // options: const AuthenticationOptions( // Pass AuthenticationOptions here
-        //   stickyAuth: true, // Keep prompt open after failed attempt
-          biometricOnly: true, // Only allow biometrics, no device PIN/Passcode fallback
+        //    stickyAuth: true, // Keep prompt open after failed attempt
+        biometricOnly: true, // Only allow biometrics, no device PIN/Passcode fallback
         // ),
       );
     } catch (e) {

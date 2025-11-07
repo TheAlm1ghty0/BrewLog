@@ -187,7 +187,7 @@ class _JoinLeaderboardScreenState extends State<JoinLeaderboardScreen> {
           // --- Loading Overlay ---
           if (_isProcessing)
             Container(
-              color: colorScheme.scrim.withOpacity(0.6),
+              color: colorScheme.scrim.withValues(alpha:0.6),
               child: const Center(child: CircularProgressIndicator()),
             ),
         ],

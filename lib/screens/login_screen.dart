@@ -188,10 +188,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (!currentContext.mounted) return;
     // Don't set loading true for auto-attempt here, _checkBiometrics... handles it
-    if (!isAutoAttempt) setState(() {
-      _isLoading = true;
-      _errorMessage = null; // Clear previous error
-    });
+    if (!isAutoAttempt) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null; // Clear previous error
+      });
+    }
 
     final username = await _authService.getUsername();
     final refreshTokenExists = (await _authService.getRefreshToken()) != null;

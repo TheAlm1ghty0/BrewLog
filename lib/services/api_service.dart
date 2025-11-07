@@ -7,9 +7,10 @@ import '../models/leaderboard.dart';
 import '../models/drink_entry.dart';
 import '../models/cocktail.dart'; // Import Cocktail model
 import 'auth_service.dart'; // Added for SessionExpiredException and AuthService
-// --- Corrected Import ---
 import 'package:http_interceptor/http_interceptor.dart'; // Defines InterceptorContract
 import 'package:local_auth/local_auth.dart'; // Import for LocalAuthentication
+import 'package:http_parser/http_parser.dart'; // <-- NEW: For image upload
+import 'dart:io'; // <-- NEW: For File
 
 // Custom Exception
 class SessionExpiredException implements Exception {
@@ -61,11 +62,13 @@ class AuthInterceptor implements InterceptorContract {
     }
 
     // Explicitly set Content-Type for relevant methods if not already set
+    // --- MODIFICATION: Do not set content-type for multipart requests ---
     if ((request.method == 'POST' || request.method == 'PUT') &&
-        request is! http.MultipartRequest &&
+        request is! http.MultipartRequest && // <-- Check if NOT multipart
         !request.headers.containsKey('Content-Type')) {
       request.headers['Content-Type'] = 'application/json; charset=UTF-8';
     }
+    // --- END MODIFICATION ---
     return request;
   }
 
@@ -100,20 +103,25 @@ class AuthInterceptor implements InterceptorContract {
               ..bodyBytes = originalRequest.bodyBytes
               ..encoding = originalRequest.encoding;
           } else if (originalRequest is http.MultipartRequest) {
-            clonedRequest = http.MultipartRequest(originalRequest.method, originalRequest.url)
+
+            // --- FIX: Create a new, strongly-typed MultipartRequest ---
+            final mpClonedRequest = http.MultipartRequest(originalRequest.method, originalRequest.url)
               ..headers.addAll(originalRequest.headers)
               ..fields.addAll(originalRequest.fields);
+
             final mpOriginalRequest = originalRequest;
             for (var file in mpOriginalRequest.files) {
-              try {
-                final List<int> fileBytes = await file.finalize().toBytes();
-                if (clonedRequest is http.MultipartRequest) {
-                  clonedRequest.files.add(http.MultipartFile.fromBytes(
-                    file.field, fileBytes, filename: file.filename, contentType: file.contentType,
-                  ));
-                }
-              } catch (e) { print("Error re-adding file '${file.filename}' during retry: $e"); }
+              mpClonedRequest.files.add(http.MultipartFile( // <-- Use new variable
+                file.field,
+                file.finalize(), // Re-stream
+                file.length,
+                filename: file.filename,
+                contentType: file.contentType,
+              ));
             }
+            clonedRequest = mpClonedRequest; // Assign back to the outer variable
+            // --- END FIX ---
+
           } else if (originalRequest is http.StreamedRequest) {
             print("Warning: Retrying StreamedRequest is not fully supported.");
             _isRefreshing = false;
@@ -126,9 +134,12 @@ class AuthInterceptor implements InterceptorContract {
           }
 
           clonedRequest.headers['Authorization'] = 'Bearer $newAccessToken';
+          // --- MODIFICATION: Do not set content-type for multipart requests ---
           if (clonedRequest is! http.MultipartRequest && !clonedRequest.headers.containsKey('Content-Type')) {
             clonedRequest.headers['Content-Type'] = 'application/json; charset=UTF-8';
           }
+          // --- END MODIFICATION ---
+
 
           print("Interceptor: Sending retried request to ${clonedRequest.url}");
           final client = http.Client();
@@ -171,21 +182,26 @@ class AuthInterceptor implements InterceptorContract {
             ..headers.addAll(originalRequest.headers)
             ..bodyBytes = originalRequest.bodyBytes
             ..encoding = originalRequest.encoding;
-        } else if (originalRequest is http.MultipartRequest) { /* ... multipart cloning ... */
-          clonedRequest = http.MultipartRequest(originalRequest.method, originalRequest.url)
+        } else if (originalRequest is http.MultipartRequest) {
+
+          // --- FIX: Create a new, strongly-typed MultipartRequest ---
+          final mpClonedRequest = http.MultipartRequest(originalRequest.method, originalRequest.url)
             ..headers.addAll(originalRequest.headers)
             ..fields.addAll(originalRequest.fields);
+
           final mpOriginalRequest = originalRequest;
           for (var file in mpOriginalRequest.files) {
-            try {
-              final List<int> fileBytes = await file.finalize().toBytes();
-              if (clonedRequest is http.MultipartRequest) {
-                clonedRequest.files.add(http.MultipartFile.fromBytes(
-                  file.field, fileBytes, filename: file.filename, contentType: file.contentType,
-                ));
-              }
-            } catch (e) { print("Error re-adding file '${file.filename}' during retry: $e"); }
+            mpClonedRequest.files.add(http.MultipartFile( // <-- Use new variable
+              file.field,
+              file.finalize(),
+              file.length,
+              filename: file.filename,
+              contentType: file.contentType,
+            ));
           }
+          clonedRequest = mpClonedRequest; // Assign back
+          // --- END FIX ---
+
         } else if (originalRequest is http.StreamedRequest) { /* ... streamed error ... */
           print("Warning: Retrying StreamedRequest is not fully supported.");
           throw SessionExpiredException(); // Fail fast if we waited and still failed
@@ -194,9 +210,11 @@ class AuthInterceptor implements InterceptorContract {
         }
 
         clonedRequest.headers['Authorization'] = 'Bearer $newAccessToken';
+        // --- MODIFICATION: Do not set content-type for multipart requests ---
         if (clonedRequest is! http.MultipartRequest && !clonedRequest.headers.containsKey('Content-Type')) {
           clonedRequest.headers['Content-Type'] = 'application/json; charset=UTF-8';
         }
+        // --- END MODIFICATION ---
 
         final client = http.Client();
         final http.StreamedResponse streamedResponse = await client.send(clonedRequest);
@@ -439,7 +457,7 @@ class ApiService {
   Future<List<Color>> getAiUIPalette(List<Color?> lockedColors) async {
     final input = lockedColors.map((color) {
       if (color == null) return "N";
-      return [color.red, color.green, color.blue];
+      return [(color.r * 255.0).round() & 0xff, (color.g * 255.0).round() & 0xff, (color.b * 255.0).round() & 0xff];
     }).toList();
 
     try {
@@ -497,6 +515,62 @@ class ApiService {
     ));
     print("ApiService: Successfully sent FCM token.");
   }
+  // --- END NEW ---
+
+  // --- NEW: uploadProfilePicture ---
+  Future<Map<String, dynamic>> uploadProfilePicture(File imageFile) async {
+    print("ApiService: Uploading profile picture...");
+
+    // 1. Get the current access token
+    final token = await AuthInterceptor().authService.getToken();
+    if (token == null) {
+      print("ApiService: No auth token found for PFP upload.");
+      throw SessionExpiredException(); // Trigger re-auth
+    }
+
+    // 2. Create the multipart request
+    final uri = Uri.parse('$_baseUrl/users/me/profile-picture');
+    var request = http.MultipartRequest('POST', uri);
+
+    // 3. Add headers
+    request.headers['Authorization'] = 'Bearer $token';
+    // Note: 'Content-Type' is set automatically by MultipartRequest
+
+    // 4. Add the file
+    request.files.add(
+      await http.MultipartFile.fromPath(
+        'file', // This 'file' key must match the backend: File(...)
+        imageFile.path,
+        contentType: MediaType('image', 'jpeg'), // Force jpeg (backend converts anyway)
+      ),
+    );
+
+    // 5. Send the request using the *base* http client
+    // We don't use the interceptor's client.send() because it's complex
+    // with streamed requests. We manually add the token and handle the response.
+    try {
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      // 6. Handle response
+      if (response.statusCode == 200) {
+        print("ApiService: PFP upload successful.");
+        return json.decode(response.body); // Returns the updated user object
+      }
+      else if (response.statusCode == 401) {
+        print("ApiService: PFP upload failed with 401. Session expired.");
+        // Don't retry here, just throw. Interceptor will catch next time.
+        throw SessionExpiredException();
+      }
+      else {
+        print("ApiService: PFP upload failed. Status: ${response.statusCode}, Body: ${response.body}");
+        throw Exception('Failed to upload image: ${response.body}');
+      }
+    } catch (e) {
+      print("ApiService: Error sending PFP: $e");
+      if (e is SessionExpiredException) rethrow;
+      throw Exception('Error uploading profile picture: $e');
+    }
+  }
 // --- END NEW ---
 }
-

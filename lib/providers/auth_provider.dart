@@ -1,9 +1,9 @@
-import 'dart:async'; // Import for StreamController
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'package:local_auth/local_auth.dart'; // Import local_auth
 import 'package:firebase_messaging/firebase_messaging.dart';
 import '../services/api_service.dart'; // To send token to backend
+import 'dart:async'; // For StreamController
 
 class AuthProvider with ChangeNotifier {
   // Pass LocalAuthentication instance to AuthService
@@ -16,23 +16,22 @@ class AuthProvider with ChangeNotifier {
   String? _username;
   bool _isBiometricsGloballyEnabled = false; // Add state for biometric preference
 
-  // --- NEW: Stream for in-app notifications ---
-  final _notificationStreamController = StreamController<RemoteMessage>.broadcast();
+  // --- NEW: Profile Picture State ---
+  String? _profilePictureUrl;
+  // --- END NEW ---
+
+  // --- NEW: Notification Stream ---
+  final StreamController<RemoteMessage> _notificationStreamController = StreamController.broadcast();
   Stream<RemoteMessage> get notificationStream => _notificationStreamController.stream;
   // --- END NEW ---
 
   bool get isAuthenticated => _isAuthenticated;
   String? get username => _username;
+  String? get profilePictureUrl => _profilePictureUrl; // <-- NEW GETTER
   bool get isBiometricsGloballyEnabled => _isBiometricsGloballyEnabled; // Getter
 
   AuthProvider() {
     _loadBiometricPreference();
-  }
-
-  @override
-  void dispose() {
-    _notificationStreamController.close(); // Close the stream
-    super.dispose();
   }
 
   Future<void> _loadBiometricPreference() async {
@@ -40,40 +39,64 @@ class AuthProvider with ChangeNotifier {
     notifyListeners(); // Notify after loading initial preference
   }
 
+  // --- MODIFIED: To handle full user object ---
   Future<void> checkAuth() async {
-    final validatedUsername = await _authService.verifyTokenAndGetUser();
+    // verifyTokenAndGetUser now returns a Map<String, dynamic>?
+    final userData = await _authService.verifyTokenAndGetUser();
 
-    if (validatedUsername != null) {
+    if (userData != null) {
       _isAuthenticated = true;
-      _username = validatedUsername;
+      _username = userData['username'];
+      _profilePictureUrl = userData['profile_picture_url']; // <-- NEW
       await _loadBiometricPreference();
-      // --- NEW: Init FCM on session verification ---
       _initFCM();
-      // --- END NEW ---
     } else {
       _isAuthenticated = false;
       _username = null;
+      _profilePictureUrl = null; // <-- NEW
       _isBiometricsGloballyEnabled = false;
     }
     notifyListeners();
   }
+  // --- END MODIFICATION ---
 
-
-  void login(String username) {
+  // --- MODIFIED: To fetch user data on login ---
+  Future<void> login(String username) async {
     _isAuthenticated = true;
     _username = username;
     _loadBiometricPreference();
-    // --- NEW: Init FCM on login ---
     _initFCM();
+
+    // --- NEW: Fetch full user data after login ---
+    try {
+      // We just logged in, so our token is valid. Call /users/me
+      final userData = await _authService.verifyTokenAndGetUser();
+      if (userData != null) {
+        _profilePictureUrl = userData['profile_picture_url'];
+      }
+    } catch (e) {
+      print("Error fetching user data after login: $e");
+    }
     // --- END NEW ---
+
     notifyListeners();
   }
+  // --- END MODIFICATION ---
+
+  // --- NEW: updateUser method ---
+  void updateUser(Map<String, dynamic> userData) {
+    _username = userData['username'];
+    _profilePictureUrl = userData['profile_picture_url'];
+    notifyListeners();
+  }
+  // --- END NEW ---
 
   // Make logout async to handle API call and token deletion
   Future<void> logout() async {
-    await _authService.logout(); // Calls AuthService.logout() which ONLY deletes access token now
+    await _authService.logout(); // Calls AuthService.logout()
     _isAuthenticated = false;
     _username = null; // Clear username in provider state
+    _profilePictureUrl = null; // <-- NEW: Clear PFP
     notifyListeners();
   }
 
@@ -148,12 +171,19 @@ class AuthProvider with ChangeNotifier {
       print('Message data: ${message.data}');
       if (message.notification != null) {
         print('Message also contained a notification: ${message.notification!.title} - ${message.notification!.body}');
-
-        // --- NEW: Broadcast the message to the UI ---
+        // --- NEW: Pass notification to stream ---
         _notificationStreamController.add(message);
         // --- END NEW ---
       }
     });
+  }
+  // --- END NEW ---
+
+  // --- NEW: Dispose Stream ---
+  @override
+  void dispose() {
+    _notificationStreamController.close();
+    super.dispose();
   }
   // --- END NEW ---
 

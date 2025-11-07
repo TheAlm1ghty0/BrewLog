@@ -208,7 +208,7 @@ class _EditDrinkScreenState extends State<EditDrinkScreen> {
         if (permission == LocationPermission.denied) throw Exception('Location permissions are denied.');
       }
       if (permission == LocationPermission.deniedForever) throw Exception('Location permissions are permanently denied, please enable in settings.');
-      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.medium, timeLimit: const Duration(seconds: 10));
+      Position position = await Geolocator.getCurrentPosition(locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium, timeLimit: Duration(seconds: 10)));
       if (!currentContext.mounted) return;
       List<Placemark> placemarks = await placemarkFromCoordinates(position.latitude, position.longitude);
       if (!currentContext.mounted) return;
@@ -604,7 +604,7 @@ class _EditDrinkScreenState extends State<EditDrinkScreen> {
           // --- Loading Overlay ---
           if (_isLoading)
             Container(
-              color: Theme.of(context).colorScheme.scrim.withOpacity(0.6),
+              color: Theme.of(context).colorScheme.scrim.withValues(alpha:0.6),
               child: const Center(
                 child: CircularProgressIndicator(),
               ),

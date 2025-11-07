@@ -25,24 +25,11 @@ class LeaderboardScreen extends StatelessWidget {
 
     bool goalMet = false;
     // Check if a goal was set and met
-    if (details.goalCategory != null && details.goalValue != null) {
-      double finalTotal = 0;
-      // Use final totals if available (calculated in backend)
-      switch (details.goalCategory) {
-        case 'drinks':
-          finalTotal = leaderboardDetail.finalTotalDrinks?.toDouble() ?? 0.0;
-          break;
-        case 'volume':
-          finalTotal = leaderboardDetail.finalTotalVolume ?? 0.0;
-          break;
-        case 'units':
-          finalTotal = leaderboardDetail.finalTotalUnits ?? 0.0;
-          break;
-      }
-      if (finalTotal >= details.goalValue!) {
-        goalMet = true;
-      }
+    // --- FIX: Check the goal_met flag from the API ---
+    if (details.goalMet) {
+      goalMet = true;
     }
+    // --- END FIX ---
 
     // Display appropriate chip based on goal status
     if (goalMet) {
@@ -91,7 +78,9 @@ class LeaderboardScreen extends StatelessWidget {
 
     // Calculate progress percentage, clamped between 0 and 1
     final double progressPercent = (currentProgressValue / goalValue).clamp(0.0, 1.0);
-    final bool isComplete = progressPercent >= 1.0;
+    // --- FIX: Check goal_met flag ---
+    final bool isComplete = details.goalMet;
+    // --- END FIX ---
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
@@ -145,6 +134,49 @@ class LeaderboardScreen extends StatelessWidget {
       ],
     );
   }
+
+  // --- NEW: Helper to build the Title Chip ---
+  Widget _buildTitleChip(BuildContext context, String title) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Chip(
+      label: Text(title),
+      labelStyle: TextStyle(
+        color: colorScheme.onSecondaryContainer,
+        fontSize: 10,
+        fontWeight: FontWeight.w600,
+      ),
+      backgroundColor: colorScheme.secondaryContainer.withOpacity(0.7),
+      padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 0),
+      visualDensity: VisualDensity.compact,
+      side: BorderSide.none,
+    );
+  }
+  // --- END NEW ---
+
+  // --- MODIFIED: Helper to build the Profile Picture (Larger) ---
+  Widget _buildProfilePicture(BuildContext context, LeaderboardEntry entry) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    if (entry.profilePictureUrl != null && entry.profilePictureUrl!.isNotEmpty) {
+      return CircleAvatar(
+        radius: 26, // <-- CHANGED from 20 to 26
+        backgroundColor: colorScheme.surfaceContainerHighest,
+        backgroundImage: NetworkImage(entry.profilePictureUrl!),
+      );
+    }
+
+    // Default avatar
+    return CircleAvatar(
+      radius: 26, // <-- CHANGED from 20 to 26
+      backgroundColor: colorScheme.surfaceContainerHighest,
+      child: Text(
+        entry.username.isNotEmpty ? entry.username[0].toUpperCase() : '?',
+        style: TextStyle(color: colorScheme.primary, fontSize: 20), // Added font size
+      ),
+    );
+  }
+  // --- END MODIFICATION ---
+
 
   @override
   Widget build(BuildContext context) {
@@ -200,7 +232,7 @@ class LeaderboardScreen extends StatelessWidget {
           child: entries.isEmpty
           // Show message if no drinks logged yet for this leaderboard
               ? const Center(child: Padding(
-            padding: EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(16.0),
             child: Text('No drinks have been logged for this leaderboard yet.', textAlign: TextAlign.center),
           ))
           // Build the list of user entries
@@ -240,17 +272,31 @@ class LeaderboardScreen extends StatelessWidget {
                     entry.username,
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
+                  // --- MODIFICATION: Subtitle is now just the stats ---
                   subtitle: Text(
                     // Format stats clearly
                     "${entry.totalDrinks} Drinks • ${_formatVolume(entry.totalVolume)} • ${entry.totalUnits.toStringAsFixed(1)} Units", // Use 1 decimal
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
-                  // Trailing could show difference from leader, or just be removed
-                  // trailing: Text(
-                  //   "#${index + 1}",
-                  //   style: Theme.of(context).textTheme.titleLarge,
-                  // ),
-                  dense: true, // Make tiles more compact
+                  // --- END MODIFICATION ---
+
+                  // --- MODIFICATION: Trailing is now a Row with Title + PFP ---
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min, // Crucial for Row in ListTile
+                    children: [
+                      // Show Title Chip if it exists
+                      if (entry.title != null) ...[
+                        _buildTitleChip(context, entry.title!),
+                        const SizedBox(width: 8), // Spacing
+                      ],
+                      // Show Profile Picture
+                      _buildProfilePicture(context, entry),
+                    ],
+                  ),
+                  // --- END MODIFICATION ---
+
+                  isThreeLine: false, // <-- CHANGED: Subtitle is only one line
+                  dense: false, // Keep false to allow vertical space for PFP
                 ),
               );
             },

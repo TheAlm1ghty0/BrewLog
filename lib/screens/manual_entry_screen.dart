@@ -340,7 +340,7 @@ class __ManualEntryFormState extends State<_ManualEntryForm> {
         if (permission == LocationPermission.denied) throw Exception('Location permissions are denied.');
       }
       if (permission == LocationPermission.deniedForever) throw Exception('Location permissions are permanently denied, please enable in settings.');
-      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.medium, timeLimit: const Duration(seconds: 10));
+      Position position = await Geolocator.getCurrentPosition(locationSettings: LocationSettings(accuracy: LocationAccuracy.medium, timeLimit: const Duration(seconds: 10)));
       if (!currentContext.mounted) return;
       List<Placemark> placemarks = await placemarkFromCoordinates(position.latitude, position.longitude);
       if (!currentContext.mounted) return;
