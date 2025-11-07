@@ -25,6 +25,10 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  // --- NEW: ScaffoldKey to control the drawer ---
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  // --- END NEW ---
+
   final PageController _pageController = PageController(initialPage: 0);
   final NotchBottomBarController _barController =
   NotchBottomBarController(index: 0);
@@ -90,7 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // --- End Utility ---
 
 
-  Future<void> _fetchInitialData() async {
+  Future<void> _fetchInitialData({Leaderboard? selectNewLeaderboard}) async {
     if (mounted) setState(() => _isLoading = true);
 
     // Wrap API calls with error handler
@@ -114,8 +118,20 @@ class _HomeScreenState extends State<HomeScreen> {
         _userLeaderboardsFuture = Future.value(leaderboards);
 
         Leaderboard? newSelectedLeaderboard;
-        // Find existing selection among new list
-        if (_selectedLeaderboard != null) {
+
+        // --- MODIFICATION: Check if a new leaderboard was passed ---
+        if (selectNewLeaderboard != null) {
+          // Find the full leaderboard object from the new list
+          newSelectedLeaderboard = leaderboards
+              .cast<Leaderboard?>()
+              .firstWhere((lb) => lb?.id == selectNewLeaderboard.id, orElse: () => null);
+
+          // If not found (shouldn't happen, but fallback), default to the one passed
+          newSelectedLeaderboard ??= selectNewLeaderboard;
+        }
+        // --- END MODIFICATION ---
+        else if (_selectedLeaderboard != null) {
+          // Find existing selection among new list
           newSelectedLeaderboard = leaderboards
               .cast<Leaderboard?>()
               .firstWhere((lb) => lb?.id == _selectedLeaderboard!.id, orElse: () => null);
@@ -171,8 +187,8 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  Future<void> _refreshData() async {
-    await _fetchInitialData();
+  Future<void> _refreshData({Leaderboard? selectNewLeaderboard}) async {
+    await _fetchInitialData(selectNewLeaderboard: selectNewLeaderboard);
   }
 
   // --- Add Drink Logic ---
@@ -329,107 +345,100 @@ class _HomeScreenState extends State<HomeScreen> {
   }
   // --- End Date Range Filtering ---
 
-
-  // --- Leaderboard Switching Logic ---
-  Future<void> _showLeaderboardSwitcher() async {
-    final currentContext = context; // Capture context
-    if (!currentContext.mounted) return;
-
-    final navigator = Navigator.of(currentContext);
-    final scaffoldMessenger = ScaffoldMessenger.of(currentContext);
-
-    // Use the existing future to avoid re-fetching list unnecessarily
+  // --- NEW: Leaderboard Drawer ---
+  /// Builds the Material 3 NavigationDrawer for switching/managing leaderboards.
+  Widget _buildLeaderboardDrawer() {
+    final navigator = Navigator.of(context);
     final currentLeaderboardsFuture = _userLeaderboardsFuture;
-    if (currentLeaderboardsFuture == null) {
-      // Should not happen if initial fetch worked, but handle defensively
-      print("Error: _userLeaderboardsFuture is null in _showLeaderboardSwitcher");
-      scaffoldMessenger.showSnackBar(const SnackBar(content: Text('Could not load leaderboard list.')));
-      return;
-    }
 
-
-    showModalBottomSheet(
-      context: currentContext, // Use captured context
-      builder: (sheetContext) => FutureBuilder<List<Leaderboard>>(
-        future: currentLeaderboardsFuture, // Use the stored future
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          // Handle error during initial fetch or empty list
-          if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-            return SafeArea(child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(title: Text(snapshot.hasError ? 'Error loading leaderboards' : 'No leaderboards found.')),
-                const Divider(),
-                // Always allow creating/joining even if list fails/is empty
-                _buildCreateAndJoinTiles(sheetContext, navigator),
-              ],
-            ));
-          }
-
-          // Display list of leaderboards
-          final leaderboards = snapshot.data!;
-          return SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ...leaderboards.map((lb) => ListTile(
-                  leading: const Icon(Icons.leaderboard_outlined),
-                  title: Text(lb.name),
-                  selected: lb.id == _selectedLeaderboard?.id,
-                  onTap: () {
-                    _selectLeaderboard(lb); // Select and fetch details
-                    Navigator.pop(sheetContext); // Close bottom sheet
-                  },
-                )),
-                const Divider(),
-                _buildCreateAndJoinTiles(sheetContext, navigator), // Add Create/Join options
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-
-  // Helper for Create/Join tiles in bottom sheet
-  Widget _buildCreateAndJoinTiles(BuildContext sheetContext, NavigatorState appNavigator) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
+    return NavigationDrawer(
       children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(28, 16, 16, 10),
+          child: Text('Manage', style: Theme.of(context).textTheme.titleSmall),
+        ),
+        // 1. Create Tile
         ListTile(
           leading: const Icon(Icons.add_circle_outline),
           title: const Text('Create Leaderboard'),
           onTap: () async {
-            Navigator.pop(sheetContext); // Close sheet first
-            final result = await appNavigator.push(
+            Navigator.pop(context); // Close drawer
+            final result = await navigator.push(
               MaterialPageRoute(builder: (context) => const CreateLeaderboardScreen()),
             );
-            // If creation was successful (returned true), refresh data
-            if (!mounted) return; // Check mounted after await
-            if (result == true) await _refreshData();
+            if (!mounted) return;
+            if (result is Leaderboard) {
+              await _refreshData(selectNewLeaderboard: result);
+            }
           },
         ),
+        // 2. Join Tile
         ListTile(
           leading: const Icon(Icons.group_add_outlined),
           title: const Text('Join Leaderboard'),
           onTap: () async {
-            Navigator.pop(sheetContext); // Close sheet first
-            final result = await appNavigator.push(
+            Navigator.pop(context); // Close drawer
+            final result = await navigator.push(
               MaterialPageRoute(builder: (context) => const JoinLeaderboardScreen()),
             );
-            // If joining was successful, refresh data
-            if (!mounted) return; // Check mounted after await
+            if (!mounted) return;
             if (result == true) await _refreshData();
+          },
+        ),
+        // 3. Divider
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 28, vertical: 8),
+          child: Divider(),
+        ),
+        // 4. Header for list
+        Padding(
+          padding: const EdgeInsets.fromLTRB(28, 8, 16, 10),
+          child: Text('Your Leaderboards', style: Theme.of(context).textTheme.titleSmall),
+        ),
+        // 5. Scrollable List of Leaderboards
+        FutureBuilder<List<Leaderboard>>(
+          future: currentLeaderboardsFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: Padding(
+                padding: EdgeInsets.all(16.0),
+                child: CircularProgressIndicator(),
+              ));
+            }
+            if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+              return const ListTile(
+                leading: Icon(Icons.warning_amber_outlined),
+                title: Text('No leaderboards found'),
+                enabled: false,
+              );
+            }
+
+            final leaderboards = snapshot.data!;
+
+            // The NavigationDrawer is scrollable, so we just return a Column
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: leaderboards.map((lb) => ListTile(
+                leading: const Icon(Icons.leaderboard_outlined),
+                title: Text(lb.name, overflow: TextOverflow.ellipsis),
+                selected: lb.id == _selectedLeaderboard?.id, // Highlight selected
+                selectedTileColor: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5),
+                onTap: () {
+                  Navigator.pop(context); // Close drawer
+                  _selectLeaderboard(lb); // Select
+                },
+              )).toList(),
+            );
           },
         ),
       ],
     );
   }
-  // --- End Leaderboard Switching ---
+  // --- END NEW ---
+
+  // --- DELETED: _showLeaderboardSwitcher and _buildCreateAndJoinTiles ---
+  // (These functions are no longer needed as their logic is in _buildLeaderboardDrawer)
+  // --- END DELETED ---
 
 
   // Builds the AppBar dynamically based on the current tab
@@ -487,7 +496,9 @@ class _HomeScreenState extends State<HomeScreen> {
       actions.add(IconButton(
         icon: const Icon(Icons.menu),
         tooltip: 'Switch Leaderboard',
-        onPressed: () => _showLeaderboardSwitcher(),
+        // --- MODIFICATION: Open drawer ---
+        onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
+        // --- END MODIFICATION ---
       ));
     }
     // --- Add Tab (index 1 - temporary state) ---
@@ -551,7 +562,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
 
     return Scaffold(
+      // --- NEW: Add ScaffoldKey ---
+      key: _scaffoldKey,
+      // --- END NEW ---
       appBar: _buildAppBar(context),
+      // --- NEW: Add Drawer ---
+      //drawer: _buildLeaderboardDrawer(),
+      endDrawer: _buildLeaderboardDrawer(),
+      // --- END NEW ---
       body: Stack(
         children: [
           PageView(
@@ -603,9 +621,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                   const Text('No leaderboard selected or you are not part of any.'),
                                   const SizedBox(height: 16),
                                   ElevatedButton.icon(
+                                    // --- MODIFICATION: Open drawer instead of modal ---
                                     icon: const Icon(Icons.menu),
                                     label: const Text('Select Leaderboard'),
-                                    onPressed: _showLeaderboardSwitcher,
+                                    onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
+                                    // --- END MODIFICATION ---
                                   )
                                 ],
                               ),
@@ -1015,9 +1035,9 @@ class _DrinkListViewState extends State<DrinkListView> {
                           // Define a 2px high rect at the bottom of the card, inset by 10%
                           final Rect anchorRect = Rect.fromLTRB(
                               offset.dx + (size.width * 0.1), // left: inset 10%
-                              offset.dy + size.height + 2,          // top: at the bottom of the card
+                              offset.dy + size.height + 2,         // top: at the bottom of the card
                               offset.dx + (size.width * 0.1) + 1, // right: inset 10% (width 80%)
-                              offset.dy + size.height + 2       // bottom: 2px below the card
+                              offset.dy + size.height + 2     // bottom: 2px below the card
                           );
                           final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
 
@@ -1119,4 +1139,3 @@ class _DrinkListViewState extends State<DrinkListView> {
     );
   }
 }
-

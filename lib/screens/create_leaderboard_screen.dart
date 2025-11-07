@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
+import '../models/leaderboard.dart'; // Import Leaderboard model
 
 class CreateLeaderboardScreen extends StatefulWidget {
   const CreateLeaderboardScreen({super.key});
@@ -111,19 +112,23 @@ class _CreateLeaderboardScreenState extends State<CreateLeaderboardScreen> {
       // --- End UTC Conversion ---
 
       // Re-added startDate parameter, passing the UTC version
-      await apiService.createLeaderboard(
+      // --- MODIFICATION: Store the returned leaderboard ---
+      final newLeaderboard = await apiService.createLeaderboard(
         name: _nameController.text,
         startDate: utcStartDate, // Send UTC time
         endDate: utcEndDate, // Send UTC time (or null)
         goalCategory: _setGoal ? _goalCategory : null,
         goalValue: _setGoal ? double.tryParse(_goalValueController.text) : null,
       );
+      // --- END MODIFICATION ---
 
       if (mounted) {
         scaffoldMessenger.showSnackBar(
           const SnackBar(content: Text('Leaderboard created successfully!')),
         );
-        navigator.pop(true); // Pop and signal success
+        // --- MODIFICATION: Pop with the new leaderboard object ---
+        navigator.pop(newLeaderboard); // Pop and signal success
+        // --- END MODIFICATION ---
       }
     } catch (e) {
       if (mounted) {
@@ -299,4 +304,3 @@ class _CreateLeaderboardScreenState extends State<CreateLeaderboardScreen> {
     );
   }
 }
-

@@ -1,22 +1,38 @@
+import 'dart:async'; // Import for StreamController
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'package:local_auth/local_auth.dart'; // Import local_auth
-import 'package:shared_preferences/shared_preferences.dart'; // Import shared_preferences
+import 'package:firebase_messaging/firebase_messaging.dart';
+import '../services/api_service.dart'; // To send token to backend
 
 class AuthProvider with ChangeNotifier {
   // Pass LocalAuthentication instance to AuthService
   final AuthService _authService = AuthService(LocalAuthentication());
+  // --- NEW: Add ApiService instance ---
+  final ApiService _apiService = ApiService();
+  // --- END NEW ---
+
   bool _isAuthenticated = false;
   String? _username;
   bool _isBiometricsGloballyEnabled = false; // Add state for biometric preference
+
+  // --- NEW: Stream for in-app notifications ---
+  final _notificationStreamController = StreamController<RemoteMessage>.broadcast();
+  Stream<RemoteMessage> get notificationStream => _notificationStreamController.stream;
+  // --- END NEW ---
 
   bool get isAuthenticated => _isAuthenticated;
   String? get username => _username;
   bool get isBiometricsGloballyEnabled => _isBiometricsGloballyEnabled; // Getter
 
   AuthProvider() {
-    // Load biometric preference on initialization
     _loadBiometricPreference();
+  }
+
+  @override
+  void dispose() {
+    _notificationStreamController.close(); // Close the stream
+    super.dispose();
   }
 
   Future<void> _loadBiometricPreference() async {
@@ -30,15 +46,14 @@ class AuthProvider with ChangeNotifier {
     if (validatedUsername != null) {
       _isAuthenticated = true;
       _username = validatedUsername;
-      await _loadBiometricPreference(); // Ensure preference is loaded on auth check
+      await _loadBiometricPreference();
+      // --- NEW: Init FCM on session verification ---
+      _initFCM();
+      // --- END NEW ---
     } else {
-      // Don't call full logout here, just clear provider state
       _isAuthenticated = false;
       _username = null;
-      _isBiometricsGloballyEnabled = false; // Reset if auth check fails
-      // We don't necessarily need to delete local tokens here,
-      // as they might be needed for biometric login on next launch.
-      // Let the login screen handle attempting biometric login if enabled.
+      _isBiometricsGloballyEnabled = false;
     }
     notifyListeners();
   }
@@ -47,8 +62,10 @@ class AuthProvider with ChangeNotifier {
   void login(String username) {
     _isAuthenticated = true;
     _username = username;
-    // Load preference *after* successful login if needed, or rely on checkAuth post-restart
-    _loadBiometricPreference(); // Ensure state reflects stored pref after login
+    _loadBiometricPreference();
+    // --- NEW: Init FCM on login ---
+    _initFCM();
+    // --- END NEW ---
     notifyListeners();
   }
 
@@ -57,7 +74,6 @@ class AuthProvider with ChangeNotifier {
     await _authService.logout(); // Calls AuthService.logout() which ONLY deletes access token now
     _isAuthenticated = false;
     _username = null; // Clear username in provider state
-    // _isBiometricsGloballyEnabled = false; // REMOVED: Do NOT reset preference on manual logout
     notifyListeners();
   }
 
@@ -65,19 +81,15 @@ class AuthProvider with ChangeNotifier {
   // Method to update biometric preference
   Future<void> setBiometricPreference(bool enabled) async {
     if (enabled) {
-      // Check if device actually supports it before enabling
       bool supported = await _authService.isDeviceSupported();
       bool canCheck = await _authService.canCheckBiometrics();
       if (supported && canCheck) {
         await _authService.enableBiometrics();
         _isBiometricsGloballyEnabled = true;
       } else {
-        // Optionally show an error if trying to enable on unsupported device
         print("Attempted to enable biometrics on unsupported device.");
-        _isBiometricsGloballyEnabled = false; // Ensure state remains false
-        // Keep the stored preference false as well
+        _isBiometricsGloballyEnabled = false;
         await _authService.disableBiometrics();
-
       }
     } else {
       await _authService.disableBiometrics();
@@ -86,8 +98,64 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  // --- NEW: FCM/Notification Logic ---
+  Future<void> _initFCM() async {
+    print("Initializing FCM and requesting permission...");
+    final messaging = FirebaseMessaging.instance;
 
-  // Expose AuthService if needed by other parts, like SettingsScreen
-  // (Be cautious about exposing the entire service)
+    // 1. Request permission from the user (for iOS and Web)
+    final settings = await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+      print('FCM: User granted permission');
+
+      // 2. Get the FCM token
+      try {
+        final fcmToken = await messaging.getToken();
+        if (fcmToken != null) {
+          print('FCM Token: $fcmToken');
+
+          // 3. Send the token to your backend
+          await _apiService.updateFcmToken(fcmToken);
+          print('FCM Token successfully sent to backend.');
+
+          // Optional: Listen for token refreshes
+          messaging.onTokenRefresh.listen((newToken) {
+            print('FCM Token refreshed: $newToken');
+            _apiService.updateFcmToken(newToken).catchError((e) {
+              print("Error sending refreshed FCM token: $e");
+            });
+          });
+
+        } else {
+          print('FCM: Unable to get token (fcmToken is null).');
+        }
+      } catch (e) {
+        print('Error getting/sending FCM token: $e');
+      }
+
+    } else {
+      print('FCM: User declined or has not accepted permission');
+    }
+
+    // Handle incoming messages (when app is in foreground)
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      print('FCM: Got a message whilst in the foreground!');
+      print('Message data: ${message.data}');
+      if (message.notification != null) {
+        print('Message also contained a notification: ${message.notification!.title} - ${message.notification!.body}');
+
+        // --- NEW: Broadcast the message to the UI ---
+        _notificationStreamController.add(message);
+        // --- END NEW ---
+      }
+    });
+  }
+  // --- END NEW ---
+
   AuthService get authService => _authService;
 }

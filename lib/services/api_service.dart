@@ -2,10 +2,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart'; // Added for 'Color' object
 import 'package:http/http.dart' as http; // Ensure http is imported
 import 'dart:async'; // Added for FutureOr, Future, Completer
-// import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/leaderboard.dart';
 import '../models/drink_entry.dart';
-import '../models/cocktail.dart'; // <<<<<<<<<< IMPORT NEW MODEL
+import '../models/cocktail.dart'; // Import Cocktail model
 import 'auth_service.dart'; // Added for SessionExpiredException and AuthService
 // --- Corrected Import ---
 import 'package:http_interceptor/http_interceptor.dart'; // Defines InterceptorContract
@@ -19,13 +19,21 @@ class SessionExpiredException implements Exception {
 
 // --- The Interceptor Logic with Queuing ---
 class AuthInterceptor implements InterceptorContract {
+  // Use a nullable AuthService and initialize lazily or pass via constructor
   AuthService? _authService;
+  // Initialize LocalAuthentication here or pass it if needed by AuthService constructor
+  // We need an instance to pass to the AuthService
   final LocalAuthentication _localAuth = LocalAuthentication();
 
+
+  // Lazy initialization or pass AuthService via constructor
   AuthService get authService {
-    _authService ??= AuthService(_localAuth);
+    // Assuming AuthService constructor now takes LocalAuthentication or similar
+    // Adjust instantiation as per your AuthService constructor
+    _authService ??= AuthService(_localAuth); // Pass _localAuth instance
     return _authService!;
   }
+
 
   bool _isRefreshing = false;
   // Completer to signal when refresh is done, holds the new token or null
@@ -85,13 +93,13 @@ class AuthInterceptor implements InterceptorContract {
           final originalRequest = response.request!;
           http.BaseRequest clonedRequest;
 
-          // Cloning logic... (simplified for brevity, assume previous version is ok for now)
+          // Cloning logic...
           if (originalRequest is http.Request) {
             clonedRequest = http.Request(originalRequest.method, originalRequest.url)
               ..headers.addAll(originalRequest.headers)
               ..bodyBytes = originalRequest.bodyBytes
               ..encoding = originalRequest.encoding;
-          } else if (originalRequest is http.MultipartRequest) { /* ... multipart cloning ... */
+          } else if (originalRequest is http.MultipartRequest) {
             clonedRequest = http.MultipartRequest(originalRequest.method, originalRequest.url)
               ..headers.addAll(originalRequest.headers)
               ..fields.addAll(originalRequest.fields);
@@ -106,12 +114,12 @@ class AuthInterceptor implements InterceptorContract {
                 }
               } catch (e) { print("Error re-adding file '${file.filename}' during retry: $e"); }
             }
-          } else if (originalRequest is http.StreamedRequest) { /* ... streamed error ... */
+          } else if (originalRequest is http.StreamedRequest) {
             print("Warning: Retrying StreamedRequest is not fully supported.");
             _isRefreshing = false;
             _refreshTokenCompleter?.complete(null); // Signal failure
             throw SessionExpiredException();
-          } else { /* ... other error ... */
+          } else {
             _isRefreshing = false;
             _refreshTokenCompleter?.complete(null);
             throw UnimplementedError("Unsupported request type: ${originalRequest.runtimeType}");
@@ -223,7 +231,7 @@ class AuthInterceptor implements InterceptorContract {
 
 class ApiService {
   final String _baseUrl = "https://api.oscarkohn.com";
-  // final _storage = const FlutterSecureStorage();
+  final _storage = const FlutterSecureStorage();
 
   // Use the interceptor client for all requests
   final http.Client client = InterceptedClient.build(
@@ -477,5 +485,18 @@ class ApiService {
     List jsonResponse = json.decode(response.body);
     return jsonResponse.map((cocktail) => Cocktail.fromJson(cocktail)).toList();
   }
+  // --- END NEW ---
+
+  // --- NEW: updateFcmToken ---
+  Future<void> updateFcmToken(String fcmToken) async {
+    print("ApiService: Attempting to send FCM token to backend.");
+    await _handleResponse(() => client.put(
+      Uri.parse('$_baseUrl/users/me/fcm_token'),
+      headers: _getJsonHeaders(),
+      body: jsonEncode({'fcm_token': fcmToken}),
+    ));
+    print("ApiService: Successfully sent FCM token.");
+  }
 // --- END NEW ---
 }
+

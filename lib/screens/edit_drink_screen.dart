@@ -433,14 +433,15 @@ class _EditDrinkScreenState extends State<EditDrinkScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text("Edit ${widget.drinkToEdit.name ?? widget.drinkToEdit.type}"),
-        actions: [
-          // Add Save button to AppBar
-          IconButton(
-            icon: const Icon(Icons.check),
-            tooltip: 'Save Changes',
-            onPressed: _isLoading ? null : _submitForm, // Disable when loading
-          ),
-        ],
+        // --- REMOVED ACTION BUTTON ---
+        // actions: [
+        //   IconButton(
+        //     icon: const Icon(Icons.check),
+        //     tooltip: 'Save Changes',
+        //     onPressed: _isLoading ? null : _submitForm, // Disable when loading
+        //   ),
+        // ],
+        // --- END REMOVAL ---
       ),
       body: Stack( // Use stack to show loading overlay
         children: [
@@ -586,15 +587,16 @@ class _EditDrinkScreenState extends State<EditDrinkScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // --- Save Button (Alternative: Keep button here instead of AppBar) ---
-                  // ElevatedButton.icon(
-                  //   icon: const Icon(Icons.check),
-                  //   label: const Text("Save Changes"),
-                  //    style: ElevatedButton.styleFrom(
-                  //       padding: const EdgeInsets.symmetric(vertical: 12),
-                  //    ),
-                  //   onPressed: _isLoading ? null : _submitForm,
-                  // ),
+                  // --- NEW: Save Button at bottom ---
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.save_alt), // Use save icon
+                    label: const Text("Save Changes"),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onPressed: _isLoading ? null : _submitForm, // Disable when loading
+                  ),
+                  // --- END NEW BUTTON ---
                 ],
               ),
             ),
@@ -612,4 +614,3 @@ class _EditDrinkScreenState extends State<EditDrinkScreen> {
     );
   }
 }
-

@@ -3,8 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:local_auth/local_auth.dart'; // Import for biometrics
 import '../services/auth_service.dart';
 import '../providers/auth_provider.dart';
-// Remove the unused ThemeProvider import if it was added
-// import '../providers/theme_provider.dart';
 import 'register_screen.dart';
 import 'package:awesome_dialog/awesome_dialog.dart'; // Import AwesomeDialog
 
@@ -27,6 +25,10 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _canCheckBiometrics = false;
   bool _attemptedAutoBiometrics = false; // Flag to prevent multiple auto-prompts
 
+  // --- FIX: Define _errorMessage ---
+  String? _errorMessage;
+  // --- END FIX ---
+
   @override
   void initState() {
     super.initState();
@@ -36,6 +38,15 @@ class _LoginScreenState extends State<LoginScreen> {
     _logStoredCredentials();
     // --- END LOGGING ---
     _checkBiometricsAndAttemptAutoLogin();
+
+    // --- NEW: Clear error when user starts typing ---
+    _usernameController.addListener(() {
+      if (_errorMessage != null) setState(() => _errorMessage = null);
+    });
+    _passwordController.addListener(() {
+      if (_errorMessage != null) setState(() => _errorMessage = null);
+    });
+    // --- END NEW ---
   }
 
   // --- ADDED LOGGING FUNCTION ---
@@ -105,7 +116,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
     // Check mounted before showing loading
     if (!currentContext.mounted) return;
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null; // Clear previous error
+    });
 
     try {
       final username = _usernameController.text;
@@ -153,7 +167,13 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       print("Password login failed: $e"); // LOGGING
       // Check mounted before showing error
-      if (currentContext.mounted) _showError(e.toString().replaceFirst('Exception: ', ''));
+      // --- FIX: Set error message state ---
+      if (currentContext.mounted) {
+        setState(() {
+          _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        });
+      }
+      // --- END FIX ---
     } finally {
       // Check mounted before stopping loading
       if (currentContext.mounted) setState(() => _isLoading = false);
@@ -168,7 +188,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (!currentContext.mounted) return;
     // Don't set loading true for auto-attempt here, _checkBiometrics... handles it
-    if (!isAutoAttempt) setState(() => _isLoading = true);
+    if (!isAutoAttempt) setState(() {
+      _isLoading = true;
+      _errorMessage = null; // Clear previous error
+    });
 
     final username = await _authService.getUsername();
     final refreshTokenExists = (await _authService.getRefreshToken()) != null;
@@ -333,98 +356,161 @@ class _LoginScreenState extends State<LoginScreen> {
     // Use local context variable
     final currentContext = context;
     if (!currentContext.mounted) return;
-    final colorScheme = Theme.of(currentContext).colorScheme;
-    ScaffoldMessenger.of(currentContext).showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          style: TextStyle(color: colorScheme.onErrorContainer), // Use container color for text
-        ),
-        backgroundColor: colorScheme.errorContainer, // Use container color for background
-        duration: const Duration(seconds: 3), // Show error longer
-      ),
-    );
+    // --- FIX: Set error message state ---
+    setState(() {
+      _errorMessage = message;
+    });
+    // --- END FIX ---
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Login')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              TextFormField(
-                controller: _usernameController,
-                decoration: const InputDecoration(
-                  labelText: 'Username',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.person_outline),
-                ),
-                validator: (value) =>
-                value!.isEmpty ? 'Please enter a username' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _passwordController,
-                decoration: const InputDecoration(
-                  labelText: 'Password',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.lock_outline),
-                ),
-                obscureText: true,
-                validator: (value) =>
-                value!.isEmpty ? 'Please enter a password' : null,
-              ),
-              const SizedBox(height: 24),
-              if (_isLoading)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 20.0), // Add padding around spinner
-                  child: CircularProgressIndicator(),
-                )
-              else
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+      // --- REMOVED AppBar ---
+      // appBar: AppBar(title: const Text('Login')),
+      body: Center( // Center the content vertically and horizontally
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch, // Make children stretch
+              children: [
+                // --- MODIFIED: App Logo with FittedBox ---
+                SizedBox(
+                  height: 240, // Desired display height for the logo
+                  child: ClipRect(
+                    child: FittedBox(
+                      fit: BoxFit.cover, // This will "zoom" and crop the image to fill the 120px height
+                      alignment: Alignment.center,
+                      child: Image.asset(
+                        'assets/logo_only.png', // Path to your logo image
+                        // No fit property here, let FittedBox handle it
+                        errorBuilder: (context, error, stackTrace) =>
+                        const Icon(Icons.local_drink, size: 120), // Placeholder
                       ),
-                      onPressed: _login,
-                      child: const Text('Login'),
                     ),
-                    const SizedBox(height: 12),
-                    // --- Biometric Button ---
-                    // Only show if supported AND check passes (e.g., fingerprint enrolled)
-                    if (_deviceSupportsBiometrics && _canCheckBiometrics)
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.fingerprint),
-                        label: const Text('Login with Biometrics'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          side: BorderSide(color: Theme.of(context).colorScheme.outline),
+                  ),
+                ),
+                // --- END MODIFIED ---
+                const SizedBox(height: 16),
+                Image.asset(
+                  'assets/text_only.png', // Path to your app name image
+                  height: 130, // Adjust height as needed
+                  errorBuilder: (context, error, stackTrace) =>
+                      Text(
+                        'BrewLog',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
-                        onPressed: () => _loginWithBiometrics(),
-                      ),
-
-                    const SizedBox(height: 24),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            // Ensure AuthService instance is passed correctly
-                            builder: (context) => RegisterScreen(authService: _authService),
-                          ),
-                        );
-                      },
-                      child: const Text('Don\'t have an account? Register'),
-                    ),
-                  ],
+                      ), // Placeholder
                 ),
-            ],
+                const SizedBox(height: 48),
+                // --- END NEW ---
+
+                TextFormField(
+                  controller: _usernameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Username',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.person_outline),
+                  ),
+                  validator: (value) =>
+                  value!.isEmpty ? 'Please enter a username' : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _passwordController,
+                  decoration: const InputDecoration(
+                    labelText: 'Password',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.lock_outline),
+                  ),
+                  obscureText: true,
+                  validator: (value) =>
+                  value!.isEmpty ? 'Please enter a password' : null,
+                ),
+                // --- MODIFICATION: Added placeholders ---
+                const SizedBox(height: 16),
+                Visibility(
+                  visible: false, // Not visible on login screen
+                  maintainState: true,
+                  maintainSize: true, // Takes up space
+                  maintainAnimation: true,
+                  child: TextFormField(
+                    readOnly: true, // Not interactive
+                    decoration: const InputDecoration(
+                      labelText: 'Confirm Password',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.lock_reset_outlined),
+                    ),
+                  ),
+                ),
+                Visibility(
+                  visible: _errorMessage != null, // Show if error exists
+                  maintainState: true, // Keep space even if null
+                  maintainSize: true,
+                  maintainAnimation: true,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: Text(
+                      _errorMessage ?? " ", // Use space to maintain height
+                      style: TextStyle(color: Theme.of(context).colorScheme.error),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+                // --- END MODIFICATION ---
+                const SizedBox(height: 24),
+                if (_isLoading)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20.0), // Add padding around spinner
+                    child: CircularProgressIndicator(),
+                  )
+                else
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: _login,
+                        child: const Text('Login'),
+                      ),
+                      const SizedBox(height: 12),
+                      // --- Biometric Button ---
+                      // Only show if supported AND check passes (e.g., fingerprint enrolled)
+                      if (_deviceSupportsBiometrics && _canCheckBiometrics)
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.fingerprint),
+                          label: const Text('Login with Biometrics'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            side: BorderSide(color: Theme.of(context).colorScheme.outline),
+                          ),
+                          onPressed: () => _loginWithBiometrics(),
+                        ),
+
+                      const SizedBox(height: 24),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              // Ensure AuthService instance is passed correctly
+                              builder: (context) => RegisterScreen(authService: _authService),
+                            ),
+                          );
+                        },
+                        child: const Text('Don\'t have an account? Register'),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
           ),
         ),
       ),
