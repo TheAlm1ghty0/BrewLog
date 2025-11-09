@@ -268,10 +268,24 @@ class LeaderboardScreen extends StatelessWidget {
                       Icon(rankIcon, color: rankIconColor, size: 20),
                     ],
                   ),
-                  title: Text(
-                    entry.username,
-                    style: Theme.of(context).textTheme.titleMedium,
+                  // --- MODIFICATION: Title is now a Column ---
+                  title: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Show Title Chip if it exists
+                      if (entry.title != null) ...[
+                        _buildTitleChip(context, entry.title!),
+                        const SizedBox(height: 4), // Spacing
+                      ],
+                      // Show Username
+                      Text(
+                        entry.username,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ],
                   ),
+                  // --- END MODIFICATION ---
+
                   // --- MODIFICATION: Subtitle is now just the stats ---
                   subtitle: Text(
                     // Format stats clearly
@@ -280,22 +294,11 @@ class LeaderboardScreen extends StatelessWidget {
                   ),
                   // --- END MODIFICATION ---
 
-                  // --- MODIFICATION: Trailing is now a Row with Title + PFP ---
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min, // Crucial for Row in ListTile
-                    children: [
-                      // Show Title Chip if it exists
-                      if (entry.title != null) ...[
-                        _buildTitleChip(context, entry.title!),
-                        const SizedBox(width: 8), // Spacing
-                      ],
-                      // Show Profile Picture
-                      _buildProfilePicture(context, entry),
-                    ],
-                  ),
+                  // --- MODIFICATION: Trailing is just the PFP ---
+                  trailing: _buildProfilePicture(context, entry),
                   // --- END MODIFICATION ---
 
-                  isThreeLine: false, // <-- CHANGED: Subtitle is only one line
+                  isThreeLine: entry.title != null, // Make tile taller if title exists
                   dense: false, // Keep false to allow vertical space for PFP
                 ),
               );

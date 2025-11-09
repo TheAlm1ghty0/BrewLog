@@ -497,7 +497,7 @@ class _HomeScreenState extends State<HomeScreen> {
         icon: const Icon(Icons.menu),
         tooltip: 'Switch Leaderboard',
         // --- MODIFICATION: Open drawer ---
-        onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
+        onPressed: () => _scaffoldKey.currentState?.openEndDrawer(), // <-- 2. CHANGED
         // --- END MODIFICATION ---
       ));
     }
@@ -566,10 +566,9 @@ class _HomeScreenState extends State<HomeScreen> {
       key: _scaffoldKey,
       // --- END NEW ---
       appBar: _buildAppBar(context),
-      // --- NEW: Add Drawer ---
-      //drawer: _buildLeaderboardDrawer(),
+      // --- MODIFICATION: Move drawer to endDrawer ---
       endDrawer: _buildLeaderboardDrawer(),
-      // --- END NEW ---
+      // --- END MODIFICATION ---
       body: Stack(
         children: [
           PageView(
@@ -624,7 +623,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     // --- MODIFICATION: Open drawer instead of modal ---
                                     icon: const Icon(Icons.menu),
                                     label: const Text('Select Leaderboard'),
-                                    onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
+                                    onPressed: () => _scaffoldKey.currentState?.openEndDrawer(), // <-- 2. CHANGED
                                     // --- END MODIFICATION ---
                                   )
                                 ],
@@ -952,8 +951,9 @@ class _DrinkListViewState extends State<DrinkListView> {
     );
   }
 
-  // Builds the main list, grouping drinks by date
-  Widget _buildGroupedList() {
+  // --- MODIFICATION: Accept systemPadding ---
+  Widget _buildGroupedList(double systemPadding) {
+    // --- END MODIFICATION ---
     // Group drinks by date (local time)
     final Map<String, List<DrinkEntry>> grouped = {};
     for (var d in widget.drinks) {
@@ -966,9 +966,10 @@ class _DrinkListViewState extends State<DrinkListView> {
       ..sort((a, b) => b.compareTo(a));
 
     return ListView.builder(
-      // --- FIX: Add bottom padding to avoid nav bar ---
-      padding: const EdgeInsets.only(top: 8, bottom: 100.0), // Increased bottom padding
-      // --- END FIX ---
+      // --- MODIFICATION: Add system padding to bottom ---
+      // We add the 100px for the app's nav bar, AND the system's nav bar padding
+      padding: EdgeInsets.only(top: 8, bottom: 100.0 + systemPadding),
+      // --- END MODIFICATION ---
       itemCount: sortedDates.length,
       itemBuilder: (context, index) {
         final dateKey = sortedDates[index];
@@ -1079,6 +1080,11 @@ class _DrinkListViewState extends State<DrinkListView> {
 
   @override
   Widget build(BuildContext context) {
+    // --- NEW: Get bottom system padding ---
+    // This is the height of the Android/iOS system navigation bar
+    final systemPadding = MediaQuery.of(context).padding.bottom;
+    // --- END NEW ---
+
     return Column(
       children: [
         // Show active date filter chip if present
@@ -1132,7 +1138,9 @@ class _DrinkListViewState extends State<DrinkListView> {
               ),
             )
             // Show the grouped list if drinks exist
-                : _buildGroupedList(),
+            // --- MODIFICATION: Pass systemPadding to list builder ---
+                : _buildGroupedList(systemPadding),
+            // --- END MODIFICATION ---
           ),
         ),
       ],
